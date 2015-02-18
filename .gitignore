@@ -1,0 +1,10 @@
+# Object files
+*.o
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects
+*.so
+*.so.*
