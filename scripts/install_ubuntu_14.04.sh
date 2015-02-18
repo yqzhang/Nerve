@@ -11,4 +11,4 @@ tar -xvf libpfm-4.6.0.tar.gz
 cd libpfm-4.6.0 && make && make install && cd ..
 rm -rf libpfm-4.6.0 libpfm-4.6.0.tar.gz
 
-cd src/ && make
+cd ../src/ && make
