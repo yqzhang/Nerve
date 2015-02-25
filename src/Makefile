@@ -1,4 +1,4 @@
-TARGET         = main
+TARGET         = neuron
 
 PERF_EVENT_HDR = /usr/local/include/perfmon/
 PFMLIB         = -lpfm
