@@ -1,6 +1,6 @@
 # Contributing
 
-We would love to have your help in making _____ better.
+We would love to have your help in making Neuron better.
 
 ## Pull Requests
 
@@ -22,5 +22,5 @@ clear and has sufficient instructions to be able to reproduce the issue.
 
 ## License
 
-By contributing to ______, you agree that your contribution will be licensed
+By contributing to Neuron, you agree that your contribution will be licensed
 under its BSD license.
