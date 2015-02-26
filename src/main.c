@@ -50,19 +50,6 @@ int main(int argc, char **argv) {
 
   setlocale(LC_ALL, "");
 
-  struct process_list *processIdList;
-  processIdList=get_process_id();
-
-  /* 
-   * processIdList is the pointer to the start of list containing all the pids. The while loop below
-   * can print all the pids.
-   */
-  
-  //while(processIdList) {
-  //  printf("%d --\n", processIdList->processId);
-  //  processIdList = processIdList->link ;
-  //}
-
   while ((c = getopt(argc, argv, "+he:pP:")) != -1) {
     switch (c) {
       case 'e':
@@ -92,9 +79,13 @@ int main(int argc, char **argv) {
 
   signal(SIGINT, sig_handler);
 
+  process_info_node_t* process_info_list;
+  process_info_node_t* curr_ptr;
+
   while (true) {
     // TODO: take a snapshot of the running processes
     // @ram
+    process_info_list = get_process_info();
 
     // TODO: take the lists of PIDs and events
     // @zhiyi @xianghan
