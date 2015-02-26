@@ -41,5 +41,5 @@ process_info_node_t* get_process_info() {
                    
   (void) closedir(dir_ptr);
 
-	return head_ptr;
+  return head_ptr;
 }
