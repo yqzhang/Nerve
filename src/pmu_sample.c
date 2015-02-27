@@ -131,6 +131,7 @@ void print_counts(perf_event_desc_t *fds, int num) {
 
 int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
   perf_event_desc_t **fds_arr = (perf_event_desc_t **) malloc(sizeof(perf_event_desc_t *)*size);
+  int *num_fds_arr = (int *) malloc(sizeof(int *) * size);
   int j, status, ret, i, num_fds = 0, grp, group_fd;
   //int ready[2], go[2];
   //char buf;
@@ -144,6 +145,7 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
   for(j=0; j<size; j++) {
     printf("In the order of j %d, pid %d\n", j, next->process_id);
     perf_event_desc_t *fds=NULL;
+    num_fds = 0;
     for (grp = 0; grp < options->num_groups; grp++) {
       ret = perf_setup_list_events(options->events[grp], &fds, &num_fds);
       if (ret || !num_fds) {
@@ -177,11 +179,13 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
           }
         }
     fds_arr[j]=fds;
+    num_fds_arr[j]=num_fds;
     next = next->next;
   }
   for (j=0; j<size; j++)
   {
     perf_event_desc_t *fds=fds_arr[j];
+    num_fds=num_fds_arr[j];
         if (options->print) {
           while (todo_option_quit == 0) {
             sleep(1);
