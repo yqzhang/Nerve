@@ -12,21 +12,12 @@
 #define __PMU_SAMPLE_H__
 
 #include "perf_util.h"
-#include "proc_sample.h"
 
 #define MAX_GROUPS 256
 
-typedef struct {
-  const char *events[MAX_GROUPS];
-  int num_groups;
-  int print;
-  int pin;
-} options_t;
+int child(char **arg);
 
-
-//int child(char **arg);
-
-int get_event_info(process_info_node_t* pid_list, int size, options_t* options);
+int parent(char **arg);
 
 void read_groups(perf_event_desc_t *fds, int num);
 
