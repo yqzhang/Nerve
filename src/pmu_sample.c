@@ -142,7 +142,7 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
   }
   process_info_node_t* next = pid_list;
   for(j=0; j<size; j++) {
-    printf("In the order of j %d, size %d\n", j, size);
+    printf("In the order of j %d, pid %d\n", j, next->process_id);
     perf_event_desc_t *fds=NULL;
     for (grp = 0; grp < options->num_groups; grp++) {
       ret = perf_setup_list_events(options->events[grp], &fds, &num_fds);
@@ -150,7 +150,6 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
         exit(1);
       }
     }
-    fds_arr[j]=fds;
     pid = next->process_id;
         for (i = 0; i < num_fds; i++) {
           int is_group_leader; /* boolean */
@@ -177,6 +176,7 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
             goto error;
           }
         }
+    fds_arr[j]=fds;
     next = next->next;
   }
   for (j=0; j<size; j++)
@@ -200,7 +200,7 @@ int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
     
   }
 
-
+  free(fds_arr);
   /* free libpfm resources cleanly */
   pfm_terminate();
   return 0;
