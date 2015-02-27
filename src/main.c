@@ -20,12 +20,6 @@
 #include "pmu_sample.h"
 #include "proc_sample.h"
 
-typedef struct {
-  const char *events[MAX_GROUPS];
-  int num_groups;
-  int print;
-  int pin;
-} options_t;
 
 options_t options;
 // TODO: maybe use this for in sig_handler
@@ -81,15 +75,20 @@ int main(int argc, char **argv) {
 
   process_info_node_t* process_info_list;
   process_info_node_t* curr_ptr;
-
-  while (true) {
+  int size=0;
+  if (true) {
     // TODO: take a snapshot of the running processes
     // @ram
     process_info_list = get_process_info();
-
+    curr_ptr = process_info_list;
+    while (curr_ptr!=NULL) {
+      size++;
+      curr_ptr=curr_ptr->next;
+    }
+    if (size > 2) size = 2;
     // TODO: take the lists of PIDs and events
     // @zhiyi @xianghan
-    parent(argv);
+    get_event_info(process_info_list, size, &options);
   }
 
   return 0;

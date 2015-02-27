@@ -9,7 +9,7 @@
  */
 
 #include "pmu_sample.h"
-
+#include "proc_sample.h"
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,20 +17,21 @@
 #include <sys/wait.h>
 
 // TODO: replace these options with parameters passed through the function call
-int todo_option_pid = 0;
+//int todo_option_pid = 0;
 int todo_option_print = 0;
-int todo_option_num_groups = 1;
-char *todo_option_events[MAX_GROUPS];
+//int todo_option_num_groups = 1;
+//char *todo_option_events[MAX_GROUPS];
 int todo_option_quit = 0;
 
+/* No use here
 int child(char **arg) {
-  /*
+  *
    * execute the requested command
    */
+  /*
   execvp(arg[0], arg);
   errx(1, "cannot exec: %s\n", arg[0]);
-  /* not reached */
-}
+}*/
 
 void read_groups(perf_event_desc_t *fds, int num) {
   uint64_t *values = NULL;
@@ -128,133 +129,83 @@ void print_counts(perf_event_desc_t *fds, int num) {
   }
 }
 
-int parent(char **arg) {
-  perf_event_desc_t *fds = NULL;
-  int status, ret, i, num_fds = 0, grp, group_fd;
-  int ready[2], go[2];
-  char buf;
+int get_event_info(process_info_node_t* pid_list,int size, options_t* options) {
+  perf_event_desc_t **fds_arr = (perf_event_desc_t **) malloc(sizeof(perf_event_desc_t *)*size);
+  int j, status, ret, i, num_fds = 0, grp, group_fd;
+  //int ready[2], go[2];
+  //char buf;
   pid_t pid;
-
-  go[0] = go[1] = -1;
+  //go[0] = go[1] = -1;
 
   if (pfm_initialize() != PFM_SUCCESS) {
     errx(1, "libpfm initialization failed");
   }
-
-  for (grp = 0; grp < todo_option_num_groups; grp++) {
-    int ret;
-    ret = perf_setup_list_events(todo_option_events[grp], &fds, &num_fds);
-    if (ret || !num_fds) {
-      exit(1);
-    }
-  }
-
-  pid = todo_option_pid;
-  if (!pid) {
-    ret = pipe(ready);
-    if (ret) {
-      err(1, "cannot create pipe ready");
-    }
-
-    ret = pipe(go);
-    if (ret) {
-      err(1, "cannot create pipe go");
-    }
-
-    /*
-     * Create the child task
-     */
-    if ((pid = fork()) == -1) {
-      err(1, "Cannot fork process");
-    }
-
-    /*
-     * and launch the child code
-     *
-     * The pipe is used to avoid a race condition
-     * between for() and exec(). We need the pid
-     * of the new tak but we want to start measuring
-     * at the first user level instruction. Thus we
-     * need to prevent exec until we have attached
-     * the events.
-     */
-    if (pid == 0) {
-      close(ready[0]);
-      close(go[1]);
-
-      /*
-       * let the parent know we exist
-       */
-      close(ready[1]);
-      if (read(go[0], &buf, 1) == -1) {
-        err(1, "unable to read go_pipe");
+  process_info_node_t* next = pid_list;
+  for(j=0; j<size; j++) {
+    printf("In the order of j %d, size %d\n", j, size);
+    perf_event_desc_t *fds=NULL;
+    for (grp = 0; grp < options->num_groups; grp++) {
+      ret = perf_setup_list_events(options->events[grp], &fds, &num_fds);
+      if (ret || !num_fds) {
+        exit(1);
       }
-
-      exit(child(arg));
     }
+    fds_arr[j]=fds;
+    pid = next->process_id;
+        for (i = 0; i < num_fds; i++) {
+          int is_group_leader; /* boolean */
 
-    close(ready[1]);
-    close(go[0]);
+          is_group_leader = perf_is_group_leader(fds, i);
+          if (is_group_leader) {
+            /* this is the group leader */
+            group_fd = -1;
+          } else {
+            group_fd = fds[fds[i].group_leader].fd;
+          }
 
-    if (read(ready[0], &buf, 1) == -1) {
-      err(1, "unable to read child_ready_pipe");
-    }
+          /*
+           * create leader disabled with enable_on-exec
+           */
+          fds[i].hw.disabled = is_group_leader;
+          fds[i].hw.enable_on_exec = is_group_leader;
 
-    close(ready[0]);
+          fds[i].hw.read_format = PERF_FORMAT_SCALE;
+
+          fds[i].fd = perf_event_open(&fds[i].hw, pid, -1, group_fd, 0);
+          if (fds[i].fd == -1) {
+            warn("cannot attach event%d %s", i, fds[i].name);
+            goto error;
+          }
+        }
+    next = next->next;
+  }
+  for (j=0; j<size; j++)
+  {
+    perf_event_desc_t *fds=fds_arr[j];
+        if (options->print) {
+          while (todo_option_quit == 0) {
+            sleep(1);
+            print_counts(fds, num_fds);
+          }
+        } else {
+          pause();
+          printf("for the pid number %d\n",j);
+          print_counts(fds, num_fds);
+        }
+
+        for (i = 0; i < num_fds; i++) {
+          close(fds[i].fd);
+        }
+        perf_free_fds(fds, num_fds);
+    
   }
 
-  for (i = 0; i < num_fds; i++) {
-    int is_group_leader; /* boolean */
-
-    is_group_leader = perf_is_group_leader(fds, i);
-    if (is_group_leader) {
-      /* this is the group leader */
-      group_fd = -1;
-    } else {
-      group_fd = fds[fds[i].group_leader].fd;
-    }
-
-    /*
-     * create leader disabled with enable_on-exec
-     */
-    fds[i].hw.disabled = is_group_leader;
-    fds[i].hw.enable_on_exec = is_group_leader;
-
-    fds[i].hw.read_format = PERF_FORMAT_SCALE;
-
-    fds[i].fd = perf_event_open(&fds[i].hw, pid, -1, group_fd, 0);
-    if (fds[i].fd == -1) {
-      warn("cannot attach event%d %s", i, fds[i].name);
-      goto error;
-    }
-  }
-
-  if (todo_option_print) {
-    while (todo_option_quit == 0) {
-      sleep(1);
-      print_counts(fds, num_fds);
-    }
-  } else {
-    if (!todo_option_pid) {
-      waitpid(pid, &status, 0);
-    } else {
-      pause();
-    }
-    print_counts(fds, num_fds);
-  }
-
-  for (i = 0; i < num_fds; i++) {
-    close(fds[i].fd);
-  }
-
-  perf_free_fds(fds, num_fds);
 
   /* free libpfm resources cleanly */
   pfm_terminate();
-
   return 0;
 error:
-  free(fds);
+  //free(fds);
 
   /* free libpfm resources cleanly */
   pfm_terminate();
