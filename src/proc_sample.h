@@ -11,11 +11,12 @@
 #ifndef __PROC_SAMPLE_H__
 #define __PROC_SAMPLE_H__
 
+
 typedef struct process_info_node {
    int process_id;
-   struct process_info_node* next;
 } process_info_node_t;
 
-process_info_node_t* get_process_info();
+process_info_node_t * get_process_info();
+void print_pid_list(process_info_node_t pid_list []);
 
 #endif

@@ -9,20 +9,27 @@
  */
 
 #include "proc_sample.h"
-
 #include <dirent.h>
 #include <stdlib.h>
 #include <stdio.h>
+#define PID_ARRAY_SIZE 500
 
-process_info_node_t* get_process_info() {
+void print_pid_list(process_info_node_t pid_list []) {
+  int iterator_pid_list;
+  for(iterator_pid_list = 0; iterator_pid_list<PID_ARRAY_SIZE; ++iterator_pid_list) {
+	if(pid_list[iterator_pid_list].process_id !=0 ) {
+		printf("%d - %d\n",iterator_pid_list,pid_list[iterator_pid_list].process_id);
+	}
+  }
+
+}
+
+process_info_node_t * get_process_info() {
   DIR* dir_ptr;
-  struct dirent* curr_dir_ptr;;
+  struct dirent* curr_dir_ptr;
 
-  process_info_node_t* curr_ptr;
-  process_info_node_t* head_ptr;
-  head_ptr = (process_info_node_t *) malloc(sizeof(process_info_node_t));
-  head_ptr->process_id = 0;
-  head_ptr->next = NULL;
+  process_info_node_t * pid_list = (process_info_node_t *)malloc(PID_ARRAY_SIZE*sizeof(process_info_node_t));
+  int iterator_pid_list=-1;
 
   dir_ptr = opendir ("/proc/");
   if (dir_ptr == NULL) {
@@ -32,14 +39,11 @@ process_info_node_t* get_process_info() {
 
   while ((curr_dir_ptr = readdir(dir_ptr))) {   
     if(curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
-      curr_ptr = (process_info_node_t *) malloc(sizeof(process_info_node_t));
-      curr_ptr->process_id = atoi(curr_dir_ptr->d_name);
-      curr_ptr->next = head_ptr->next;
-      head_ptr->next = curr_ptr;
+      pid_list[++iterator_pid_list].process_id = atoi(curr_dir_ptr->d_name);
     }
   }
                    
   (void) closedir(dir_ptr);
 
-  return head_ptr;
+  return pid_list;
 }

@@ -78,19 +78,18 @@ int main(int argc, char **argv) {
   }
 
   signal(SIGINT, sig_handler);
-
-  process_info_node_t* process_info_list;
-  process_info_node_t* curr_ptr;
-
-  while (true) {
-    // TODO: take a snapshot of the running processes
-    // @ram
-    process_info_list = get_process_info();
-
-    // TODO: take the lists of PIDs and events
-    // @zhiyi @xianghan
-    parent(argv);
+  
+  process_info_node_t *pid_list;
+  while(true) {
+    pid_list = get_process_info();
+   /*
+    * The print_pid_list() function prints the list of all the PIDs.pid_list is an
+    * array of the list of PIDs of the processes running in the system.
+    */
+    print_pid_list(pid_list);
+    free(pid_list);
   }
+
 
   return 0;
 }
