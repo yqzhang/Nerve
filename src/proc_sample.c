@@ -25,23 +25,23 @@ void get_process_info(process_list_t* process_list) {
   DIR* dir_ptr;
   struct dirent* curr_dir_ptr;
 
-  dir_ptr = opendir ("/proc/");
+  dir_ptr = opendir("/proc/");
   if (dir_ptr == NULL) {
     perror("Cound not open directory /proc/.");
-    return ;
+    return;
   }
 
   process_list->size = 0;
-  while ((curr_dir_ptr = readdir(dir_ptr))) {   
-    if(curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
+  while ((curr_dir_ptr = readdir(dir_ptr))) {
+    if (curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
       if (process_list->size >= MAX_NUM_PROCESSES) {
         perror("Too many processes.");
-        return ;
+        return;
       }
-      process_list->processes[process_list->size++].process_id = 
-        atoi(curr_dir_ptr->d_name);
+      process_list->processes[process_list->size++].process_id =
+          atoi(curr_dir_ptr->d_name);
     }
   }
-                   
-  (void) closedir(dir_ptr);
+
+  (void)closedir(dir_ptr);
 }

@@ -78,9 +78,9 @@ int main(int argc, char **argv) {
   }
 
   signal(SIGINT, sig_handler);
-  
+
   process_list_t process_info_list;
-  while(true) {
+  while (true) {
     get_process_info(&process_info_list);
     print_process_info(&process_info_list);
   }
