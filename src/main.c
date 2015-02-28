@@ -83,7 +83,6 @@ int main(int argc, char **argv) {
   while(true) {
     get_process_info(&process_info_list);
     print_process_info(&process_info_list);
-    return 0;
   }
 
   return 0;
