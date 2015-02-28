@@ -79,17 +79,12 @@ int main(int argc, char **argv) {
 
   signal(SIGINT, sig_handler);
   
-  process_info_node_t *pid_list;
+  process_list_t process_info_list;
   while(true) {
-    pid_list = get_process_info();
-   /*
-    * The print_pid_list() function prints the list of all the PIDs.pid_list is an
-    * array of the list of PIDs of the processes running in the system.
-    */
-    print_pid_list(pid_list);
-    free(pid_list);
+    get_process_info(&process_info_list);
+    print_process_info(&process_info_list);
+    return 0;
   }
-
 
   return 0;
 }

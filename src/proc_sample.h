@@ -11,12 +11,21 @@
 #ifndef __PROC_SAMPLE_H__
 #define __PROC_SAMPLE_H__
 
+#include <sys/types.h>
 
-typedef struct process_info_node {
-   int process_id;
-} process_info_node_t;
+#define MAX_NUM_PROCESSES 512
 
-process_info_node_t * get_process_info();
-void print_pid_list(process_info_node_t pid_list []);
+typedef struct process {
+  int process_id;
+} process_t;
+
+typedef struct process_list {
+  process_t processes[MAX_NUM_PROCESSES];
+  size_t size;
+} process_list_t;
+
+void get_process_info(process_list_t* process_info_list);
+
+void print_process_info(process_list_t* process_info_list);
 
 #endif

@@ -9,41 +9,39 @@
  */
 
 #include "proc_sample.h"
+
 #include <dirent.h>
 #include <stdlib.h>
 #include <stdio.h>
-#define PID_ARRAY_SIZE 500
 
-void print_pid_list(process_info_node_t pid_list []) {
-  int iterator_pid_list;
-  for(iterator_pid_list = 0; iterator_pid_list<PID_ARRAY_SIZE; ++iterator_pid_list) {
-	if(pid_list[iterator_pid_list].process_id !=0 ) {
-		printf("%d - %d\n",iterator_pid_list,pid_list[iterator_pid_list].process_id);
-	}
+void print_process_info(process_list_t* process_list) {
+  int i;
+  for (i = 0; i < process_list->size; i++) {
+    printf("%d - PID: %d\n", i, process_list->processes[i].process_id);
   }
-
 }
 
-process_info_node_t * get_process_info() {
+void get_process_info(process_list_t* process_list) {
   DIR* dir_ptr;
   struct dirent* curr_dir_ptr;
-
-  process_info_node_t * pid_list = (process_info_node_t *)malloc(PID_ARRAY_SIZE*sizeof(process_info_node_t));
-  int iterator_pid_list=-1;
 
   dir_ptr = opendir ("/proc/");
   if (dir_ptr == NULL) {
     perror("Cound not open directory /proc/.");
-    return NULL;
+    return ;
   }
 
+  process_list->size = 0;
   while ((curr_dir_ptr = readdir(dir_ptr))) {   
     if(curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
-      pid_list[++iterator_pid_list].process_id = atoi(curr_dir_ptr->d_name);
+      if (process_list->size >= MAX_NUM_PROCESSES) {
+        perror("Too many processes.");
+        return ;
+      }
+      process_list->processes[process_list->size++].process_id = 
+        atoi(curr_dir_ptr->d_name);
     }
   }
                    
   (void) closedir(dir_ptr);
-
-  return pid_list;
 }
