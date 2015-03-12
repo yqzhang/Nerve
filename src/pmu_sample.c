@@ -77,10 +77,7 @@ void read_groups(perf_event_desc_t *fds, int num) {
   }
 }
 
-
-void print_pmu_sample(perf_event_desc_t **fds,
-                      int num_fds,
-                      int num_procs,
+void print_pmu_sample(perf_event_desc_t **fds, int num_fds, int num_procs,
                       uint64_t proc_info[][20]) {
   uint64_t val;
   uint64_t values[3];
@@ -93,12 +90,12 @@ void print_pmu_sample(perf_event_desc_t **fds,
    * libpfm guarantees that counters for the events always
    * come first.
    */
-  for(proc_index = 0; proc_index < num_procs; proc_index++){
+  for (proc_index = 0; proc_index < num_procs; proc_index++) {
     memset(values, 0, sizeof(values));
 
     for (fds_index = 0; fds_index < num_fds; fds_index++) {
       ret = read(fds[proc_index][fds_index].fd, values, sizeof(values));
-      if (ret < (ssize_t) sizeof(values)) {
+      if (ret < (ssize_t)sizeof(values)) {
         if (ret == -1) {
           err(1, "cannot read results: %s", "strerror(errno)");
         } else {
@@ -112,24 +109,21 @@ void print_pmu_sample(perf_event_desc_t **fds,
       val = perf_scale(values);
       ratio = perf_scale_ratio(values);
 
-      printf("%'20"PRIu64" %s (%.2f%% scaling, raw=%'"PRIu64", ena=%'"PRIu64", run=%'"PRIu64")\n",
-        val,
-        fds[0][fds_index].name,
-        (1.0 - ratio) * 100.0,
-        values[0],
-        values[1],
-        values[2]);
+      printf("%'20" PRIu64 " %s (%.2f%% scaling, raw=%'" PRIu64
+             ", ena=%'" PRIu64 ", run=%'" PRIu64 ")\n",
+             val, fds[0][fds_index].name, (1.0 - ratio) * 100.0, values[0],
+             values[1], values[2]);
       proc_info[proc_index][fds_index] = val;
     }
   }
 }
 
-void get_pmu_sample(process_list_t* process_info_list,
-                    const char* events[MAX_GROUPS],
+void get_pmu_sample(process_list_t *process_info_list,
+                    const char *events[MAX_GROUPS],
                     unsigned int sample_interval) {
   perf_event_desc_t *fds[512];
   int fds_index, proc_index, ret, num_fds;
-  uint64_t proc_info[512][20]; // The data structure for storing the count.
+  uint64_t proc_info[512][20];  // The data structure for storing the count.
 
   /*
    * Initialize pfm library (required before we can use it)
@@ -140,7 +134,8 @@ void get_pmu_sample(process_list_t* process_info_list,
   }
 
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
-    proc_info[proc_index][0] = process_info_list->processes[proc_index].process_id;
+    proc_info[proc_index][0] =
+        process_info_list->processes[proc_index].process_id;
     fds[proc_index] = NULL;
     ret = perf_setup_argv_events(events, &(fds[proc_index]), &num_fds);
     if (ret || !num_fds) {
@@ -154,12 +149,8 @@ void get_pmu_sample(process_list_t* process_info_list,
       fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
       fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
       /* each event is in an independent group (multiplexing likely) */
-      fds[proc_index][fds_index].fd =
-        perf_event_open(&fds[proc_index][fds_index].hw,
-                        proc_info[proc_index][0],
-                        -1,
-                        -1,
-                        0);
+      fds[proc_index][fds_index].fd = perf_event_open(
+          &fds[proc_index][fds_index].hw, proc_info[proc_index][0], -1, -1, 0);
       if (fds[proc_index][fds_index].fd == -1) {
         err(1, "cannot open event %d", fds_index);
       }
@@ -182,12 +173,11 @@ void get_pmu_sample(process_list_t* process_info_list,
    * disable all counters attached to this thread
    */
   ret = prctl(PR_TASK_PERF_EVENTS_DISABLE);
-  if (ret)
-    err(1, "prctl(disable) failed");
+  if (ret) err(1, "prctl(disable) failed");
 
-  for(proc_index = 0; proc_index < process_info_list->size; ++proc_index){
+  for (proc_index = 0; proc_index < process_info_list->size; ++proc_index) {
     for (fds_index = 0; fds_index < num_fds; fds_index++)
-    close(fds[proc_index][fds_index].fd);
+      close(fds[proc_index][fds_index].fd);
 
     perf_free_fds(fds[proc_index], num_fds);
   }
