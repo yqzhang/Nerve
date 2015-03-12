@@ -14,8 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-void read_groups(perf_event_desc_t *fds, int num) {
-  uint64_t *values = NULL;
+void read_groups(perf_event_desc_t* fds, int num) {
+  uint64_t* values = NULL;
   size_t new_sz, sz = 0;
   int i, evt;
   ssize_t ret;
@@ -77,7 +77,7 @@ void read_groups(perf_event_desc_t *fds, int num) {
   }
 }
 
-void print_pmu_sample(perf_event_desc_t **fds, int num_fds, int num_procs,
+void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
                       uint64_t proc_info[][20]) {
   uint64_t val;
   uint64_t values[3];
@@ -118,10 +118,10 @@ void print_pmu_sample(perf_event_desc_t **fds, int num_fds, int num_procs,
   }
 }
 
-void get_pmu_sample(process_list_t *process_info_list,
-                    const char *events[MAX_GROUPS],
+void get_pmu_sample(process_list_t* process_info_list,
+                    const char* events[MAX_GROUPS],
                     unsigned int sample_interval) {
-  perf_event_desc_t *fds[512];
+  perf_event_desc_t* fds[512];
   int fds_index, proc_index, ret, num_fds;
   uint64_t proc_info[512][20];  // The data structure for storing the count.
 
