@@ -11,19 +11,23 @@
 #ifndef __PMU_SAMPLE_H__
 #define __PMU_SAMPLE_H__
 
-#include <time.h>
-#include <perfmon/pfmlib_perf_event.h>
-#include "perf_util.h"
 #include "proc_sample.h"
 
+#include "perf_util.h"
+
+#include <perfmon/pfmlib_perf_event.h>
 
 #define MAX_GROUPS 256
 
-
-int get_pid_count(process_list_t* process_info_list);
+void get_pmu_sample(process_list_t* process_info_list,
+                    const char* events[MAX_GROUPS],
+                    unsigned int sample_interval);
 
 void read_groups(perf_event_desc_t *fds, int num);
 
-void print_counts(perf_event_desc_t **fds, int num_fds, int proc_num, uint64_t proc_info[][20]);
+void print_pmu_sample(perf_event_desc_t **fds,
+                      int num_fds,
+                      int proc_num,
+                      uint64_t proc_info[][20]);
 
 #endif

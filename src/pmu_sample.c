@@ -10,21 +10,9 @@
 
 #include "pmu_sample.h"
 
-#include <inttypes.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-
-// TODO: replace these options with parameters passed through the function call
-#define max_proc_num = 512
-
-int todo_option_pid = 0;
-int todo_option_print = 0;
-int todo_option_num_groups = 1;
-const char *todo_option_events[MAX_GROUPS];
-int todo_option_quit = 0;
-
 
 void read_groups(perf_event_desc_t *fds, int num) {
   uint64_t *values = NULL;
@@ -90,9 +78,10 @@ void read_groups(perf_event_desc_t *fds, int num) {
 }
 
 
-void print_counts(perf_event_desc_t **fds, int num_fds, int proc_num, uint64_t proc_info[][20])
-{
-
+void print_pmu_sample(perf_event_desc_t **fds,
+                      int num_fds,
+                      int num_procs,
+                      uint64_t proc_info[][20]) {
   uint64_t val;
   uint64_t values[3];
   double ratio;
@@ -104,16 +93,17 @@ void print_counts(perf_event_desc_t **fds, int num_fds, int proc_num, uint64_t p
    * libpfm guarantees that counters for the events always
    * come first.
    */
-  for(proc_index = 0; proc_index < proc_num; ++proc_index){
+  for(proc_index = 0; proc_index < num_procs; proc_index++){
     memset(values, 0, sizeof(values));
-    for (fds_index = 0; fds_index < num_fds; fds_index++) {
 
+    for (fds_index = 0; fds_index < num_fds; fds_index++) {
       ret = read(fds[proc_index][fds_index].fd, values, sizeof(values));
-      if (ret < (ssize_t)sizeof(values)) {
-        if (ret == -1)
+      if (ret < (ssize_t) sizeof(values)) {
+        if (ret == -1) {
           err(1, "cannot read results: %s", "strerror(errno)");
-        else
+        } else {
           warnx("could not read event%d", fds_index);
+        }
       }
       /*
        * scaling is systematic because we may be sharing the PMU and
@@ -122,76 +112,71 @@ void print_counts(perf_event_desc_t **fds, int num_fds, int proc_num, uint64_t p
       val = perf_scale(values);
       ratio = perf_scale_ratio(values);
 
-      printf("%s %'20"PRIu64" %s (%.2f%% scaling, raw=%'"PRIu64", ena=%'"PRIu64", run=%'"PRIu64")\n",
-        "final",
+      printf("%'20"PRIu64" %s (%.2f%% scaling, raw=%'"PRIu64", ena=%'"PRIu64", run=%'"PRIu64")\n",
         val,
         fds[0][fds_index].name,
-        (1.0-ratio)*100.0,
-              values[0],
+        (1.0 - ratio) * 100.0,
+        values[0],
         values[1],
         values[2]);
-      proc_info[proc_index][fds_index+1] = val;
+      proc_info[proc_index][fds_index] = val;
     }
   }
-  
+}
 
-  
-}  
-
-int get_pid_count(process_list_t* process_info_list) {
-  
-  todo_option_events[0] = "cycles";
-  todo_option_events[1] ="instructions";
+void get_pmu_sample(process_list_t* process_info_list,
+                    const char* events[MAX_GROUPS],
+                    unsigned int sample_interval) {
   perf_event_desc_t *fds[512];
-  int fds_index, ret, num_fds;
-  int proc_index = 0;
+  int fds_index, proc_index, ret, num_fds;
   uint64_t proc_info[512][20]; // The data structure for storing the count.
+
   /*
    * Initialize pfm library (required before we can use it)
    */
   ret = pfm_initialize();
-  if (ret != PFM_SUCCESS)
+  if (ret != PFM_SUCCESS) {
     errx(1, "Cannot initialize library: %s", pfm_strerror(ret));
+  }
 
-  for(; proc_index < process_info_list->size; ++proc_index){
-    printf("%d %d\n", (process_info_list->processes[proc_index]).process_id, proc_index);
-    proc_info[proc_index][0] = (process_info_list->processes[proc_index]).process_id;
+  for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
+    proc_info[proc_index][0] = process_info_list->processes[proc_index].process_id;
     fds[proc_index] = NULL;
-    ret = perf_setup_argv_events(todo_option_events, &(fds[proc_index]), &num_fds);
-    if (ret || !num_fds)
+    ret = perf_setup_argv_events(events, &(fds[proc_index]), &num_fds);
+    if (ret || !num_fds) {
       errx(1, "cannot setup events");
+    }
 
     fds[proc_index][0].fd = -1;
 
-    for(fds_index=0; fds_index < num_fds; fds_index++) {
-    /* request timing information necessary for scaling */
+    for (fds_index = 0; fds_index < num_fds; fds_index++) {
+      /* request timing information necessary for scaling */
       fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
-
       fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
-
       /* each event is in an independent group (multiplexing likely) */
-      fds[proc_index][fds_index].fd = perf_event_open(&fds[proc_index][fds_index].hw, proc_info[proc_index][0], -1, -1, 0);
-      if (fds[proc_index][fds_index].fd == -1)
+      fds[proc_index][fds_index].fd =
+        perf_event_open(&fds[proc_index][fds_index].hw,
+                        proc_info[proc_index][0],
+                        -1,
+                        -1,
+                        0);
+      if (fds[proc_index][fds_index].fd == -1) {
         err(1, "cannot open event %d", fds_index);
+      }
     }
-    
-
   }
 
   /*
    * enable all counters attached to this thread and created by it
    */
   ret = prctl(PR_TASK_PERF_EVENTS_ENABLE);
-  if (ret)
+  if (ret) {
     err(1, "prctl(enable) failed");
+  }
 
-  print_counts(fds, num_fds, process_info_list->size, proc_info);
+  usleep(sample_interval);
 
-  //alarm(10);
-
-  clock_t c_begin = clock();
-  do{}
-  while(clock() < (c_begin + 1e6));
+  print_pmu_sample(fds, num_fds, process_info_list->size, proc_info);
 
   /*
    * disable all counters attached to this thread
@@ -200,17 +185,13 @@ int get_pid_count(process_list_t* process_info_list) {
   if (ret)
     err(1, "prctl(disable) failed");
 
-
   for(proc_index = 0; proc_index < process_info_list->size; ++proc_index){
     for (fds_index = 0; fds_index < num_fds; fds_index++)
     close(fds[proc_index][fds_index].fd);
 
     perf_free_fds(fds[proc_index], num_fds);
   }
-  
 
   /* free libpfm resources cleanly */
   pfm_terminate();
-
-  return 0;  
 }
