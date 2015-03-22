@@ -47,6 +47,7 @@ static void usage(void) {
 
 int main(int argc, char** argv) {
   int c;
+  int num_iterations=1;
 
   setlocale(LC_ALL, "");
 
@@ -82,9 +83,10 @@ int main(int argc, char** argv) {
   process_list_t process_info_list;
 
   while (true) {
-    get_process_info(&process_info_list);
+    get_process_info(&process_info_list,num_iterations);
     print_process_info(&process_info_list);
     get_pmu_sample(&process_info_list, options.events, 1e6);
+    ++num_iterations;
   }
 
   return 0;
