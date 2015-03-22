@@ -14,17 +14,26 @@
 #include <sys/types.h>
 
 #define MAX_NUM_PROCESSES 512
+/*
+Max processes can only be 511
+*/
 
 typedef struct process {
   int process_id;
+  long unsigned int user_time;
+  long unsigned int system_time;
+  long unsigned int cuser_time;
+  long unsigned int csystem_time;
+  float cpu_utilization;
 } process_t;
 
 typedef struct process_list {
   process_t processes[MAX_NUM_PROCESSES];
+  long unsigned int cpu_total_time;
   size_t size;
 } process_list_t;
 
-void get_process_info(process_list_t* process_info_list);
+void get_process_info(process_list_t* process_info_list, int num_iterations);
 
 void print_process_info(process_list_t* process_info_list);
 
