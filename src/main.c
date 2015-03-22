@@ -21,7 +21,7 @@
 #include "proc_sample.h"
 
 typedef struct {
-  const char *events[MAX_GROUPS];
+  const char* events[MAX_GROUPS];
   int num_groups;
   int print;
   int pin;
@@ -45,7 +45,7 @@ static void usage(void) {
       "allowed)\n");
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   int c;
 
   setlocale(LC_ALL, "");
@@ -80,9 +80,11 @@ int main(int argc, char **argv) {
   signal(SIGINT, sig_handler);
 
   process_list_t process_info_list;
+
   while (true) {
     get_process_info(&process_info_list);
     print_process_info(&process_info_list);
+    get_pmu_sample(&process_info_list, options.events, 1e6);
   }
 
   return 0;
