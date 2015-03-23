@@ -24,5 +24,8 @@ $(TARGET): $(OBJS)
 
 .PHONY: clean
 
+run : all
+	./$(TARGET)
+
 clean:
 	$(RM) -f *.o $(TARGET) *~

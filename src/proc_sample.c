@@ -86,15 +86,25 @@ void get_process_info(process_list_t* process_list, int num_iterations) {
       if(fp == NULL){
         perror("Stat File for PID does not exist \n");
       }
-      fscanf(fp, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu %lu %lu", &utime_ticks_after, &stime_ticks_after, &cutime_ticks_after, &cstime_ticks_after);
+      fscanf(fp, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu"
+        "%lu %lu", &utime_ticks_after, &stime_ticks_after, &cutime_ticks_after, 
+          &cstime_ticks_after);
       fclose(fp);
+
       if(num_iterations == 1) { 
 	// During the first iteration profile for all values
         process_list->processes[process_list->size].process_id =
             atoi(curr_dir_ptr->d_name);
         process_list->processes[process_list->size].cpu_utilization =
-            ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - process_list->processes[process_list->size].user_time - process_list->processes[process_list->size].cuser_time  ) / (cpu_total_time_after - process_list->cpu_total_time)) + 
-            ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - process_list->processes[process_list->size].system_time - process_list->processes[process_list->size].csystem_time  ) / (cpu_total_time_after - process_list->cpu_total_time));
+            ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - 
+            process_list->processes[process_list->size].user_time - 
+            process_list->processes[process_list->size].cuser_time  ) 
+            / (cpu_total_time_after - process_list->cpu_total_time)) + 
+            ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - 
+            process_list->processes[process_list->size].system_time - 
+            process_list->processes[process_list->size].csystem_time  ) 
+            / (cpu_total_time_after - process_list->cpu_total_time));
+
         process_list->processes[process_list->size].user_time =
           utime_ticks_after;
         process_list->processes[process_list->size].system_time =
@@ -103,8 +113,11 @@ void get_process_info(process_list_t* process_list, int num_iterations) {
           cutime_ticks_after;
         process_list->processes[process_list->size].csystem_time =
           cstime_ticks_after;
-        if(process_list->processes[process_list->size].cpu_utilization > 1)
-           printf("PID of that process is %d and utilization is %f\n", process_list->processes[process_list->size].process_id, process_list->processes[process_list->size].cpu_utilization );
+        if(process_list->processes[process_list->size].cpu_utilization > 1) {
+           printf("PID of that process is %d and utilization is %f\n", 
+             process_list->processes[process_list->size].process_id, 
+             process_list->processes[process_list->size].cpu_utilization );
+        }
         process_list->size++;
       } else {
 	//Non first iterations
@@ -112,8 +125,14 @@ void get_process_info(process_list_t* process_list, int num_iterations) {
         if(temp_pid == process_list->processes[process_list->size].process_id || process_list->processes[process_list->size].process_id == 0 ) {
         //If the pid at that entry in the queue has not changed!!
         process_list->processes[process_list->size].cpu_utilization =
-            ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - process_list->processes[process_list->size].user_time - process_list->processes[process_list->size].cuser_time  ) / (cpu_total_time_after - process_list->cpu_total_time)) + 
-            ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - process_list->processes[process_list->size].system_time - process_list->processes[process_list->size].csystem_time  ) / (cpu_total_time_after - process_list->cpu_total_time));
+            ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - 
+            process_list->processes[process_list->size].user_time - 
+            process_list->processes[process_list->size].cuser_time  ) 
+            / (cpu_total_time_after - process_list->cpu_total_time)) + 
+            ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - 
+            process_list->processes[process_list->size].system_time - 
+            process_list->processes[process_list->size].csystem_time  ) 
+            / (cpu_total_time_after - process_list->cpu_total_time));
           process_list->processes[process_list->size].user_time =
             utime_ticks_after;
           process_list->processes[process_list->size].system_time =
@@ -157,7 +176,6 @@ void get_process_info(process_list_t* process_list, int num_iterations) {
           }
               process_list->processes[size_previous_iteration].process_id = 0;
           next_pid = false;
-          //process_list->size++;
         } else {
           printf("Something wrong happened \n");
           exit(0);
