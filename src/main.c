@@ -33,6 +33,7 @@ static volatile int quit;
 
 static void sig_handler(int n) {
   // TODO: handle interrupts
+  exit(0);
 }
 
 static void usage(void) {
@@ -84,9 +85,11 @@ int main(int argc, char** argv) {
 
   while (true) {
     get_process_info(&process_info_list,num_iterations);
-    print_process_info(&process_info_list);
-    get_pmu_sample(&process_info_list, options.events, 1e6);
+    //print_process_info(&process_info_list);
+    //get_pmu_sample(&process_info_list, options.events, 1e6);
+    sleep(2);
     ++num_iterations;
+    printf("****************\n");
   }
 
   return 0;
