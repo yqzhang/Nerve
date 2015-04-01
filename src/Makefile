@@ -11,7 +11,8 @@ CFLAGS         = -Wall -D_GNU_SOURCE $(INCLUDES)
 SRCS = main.c \
        perf_util.c \
        pmu_sample.c \
-       proc_sample.c
+       proc_sample.c \
+			 app_sample.c
 
 OBJS = $(SRCS:.c=.o)
 
@@ -23,9 +24,6 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $? $(LIBS)
 
 .PHONY: clean
-
-run : all
-	./$(TARGET)
 
 clean:
 	$(RM) -f *.o $(TARGET) *~
