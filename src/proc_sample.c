@@ -64,9 +64,8 @@ void get_process_info(process_list_t* process_list,
       sprintf(pid_stat_location, "/proc/%s/stat", curr_dir_ptr->d_name);
       fp = fopen(pid_stat_location, "r");
       if (fp == NULL) {
-        fprintf(stderr, "Stat file /proc/%s/stat does not exist.\n",
-                curr_dir_ptr->d_name);
-        exit(1);
+        // This means the process has gone shortly after we list the directory
+        continue;
       }
 
       // Read /proc/*/stat for the CPU utilization information of specific PIDs
