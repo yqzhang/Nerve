@@ -19,21 +19,26 @@ Max processes can only be 511
 */
 
 typedef struct process {
-  int process_id;
-  long unsigned int user_time;
-  long unsigned int system_time;
-  long unsigned int cuser_time;
-  long unsigned int csystem_time;
+  unsigned int process_id;
+  unsigned long utime;
+  unsigned long stime;
+  unsigned long cutime;
+  unsigned long cstime;
+  unsigned long ttime;
   float cpu_utilization;
 } process_t;
 
 typedef struct process_list {
   process_t processes[MAX_NUM_PROCESSES];
-  long unsigned int cpu_total_time;
+  unsigned long cpu_total_time;
   size_t size;
 } process_list_t;
 
-void get_process_info(process_list_t* process_info_list, int num_iterations);
+void get_process_info(process_list_t* process_info_list,
+                      process_list_t* prev_process_info_list);
+
+void swap_process_list(process_list_t** process_list_a,
+                       process_list_t** process_list_b);
 
 void print_process_info(process_list_t* process_info_list);
 

@@ -11,184 +11,142 @@
 #include "proc_sample.h"
 
 #include <dirent.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <stdbool.h> 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void get_process_info(process_list_t* process_list,
+                      process_list_t* prev_process_list) {
+  struct dirent* curr_dir_ptr;
+
+  // Read /proc/stat for total CPU time spent by far
+  // cpu %user %nice %system %idle %iowait %irq %softirq
+  char pid_stat_location[30] = "/proc/stat";
+  FILE *fp;
+  fp = fopen(pid_stat_location, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Stat File %s does not exist.\n", pid_stat_location);
+    exit(1);
+  }
+  unsigned long temp_cpu_total_time[7];
+  fscanf(fp, "%*s %lu %lu %lu %lu %lu %lu %lu",
+         &temp_cpu_total_time[0], &temp_cpu_total_time[1],
+         &temp_cpu_total_time[2], &temp_cpu_total_time[3], 
+         &temp_cpu_total_time[4], &temp_cpu_total_time[5],
+         &temp_cpu_total_time[6]);
+  fclose(fp);
+  // Reset the size of the process list to 0
+  process_list->size = 0;
+  // Sum all fields up to get total CPU time
+  process_list->cpu_total_time = 0;
+  int i;
+  for (i = 0; i < 7; i++) {
+    process_list->cpu_total_time += temp_cpu_total_time[i];
+  }
+
+  // Read /proc/*/stat to get CPU utilization for specific
+  // processes
+  DIR* dir_ptr = opendir("/proc/");
+  if (dir_ptr == NULL) {
+    fprintf(stderr, "Cound not open directory /proc/.");
+    exit(1);
+  }
+
+  int temp_pid;
+  i = 0;
+  while ((curr_dir_ptr = readdir(dir_ptr)) != NULL) {
+    if (curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
+      if (process_list->size >= MAX_NUM_PROCESSES) {
+        fprintf(stderr, "Too many processes (max: %d).", MAX_NUM_PROCESSES);
+        exit(1);
+      }
+      sprintf(pid_stat_location, "/proc/%s/stat", curr_dir_ptr->d_name);
+      fp = fopen(pid_stat_location, "r");
+      if (fp == NULL) {
+        fprintf(stderr, "Stat file /proc/%s/stat does not exist.\n",
+                curr_dir_ptr->d_name);
+        exit(1);
+      }
+
+      // Read /proc/*/stat for the CPU utilization information of specific PIDs
+      // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+      // ...
+      // (3)  state  %c  : indicates process state
+      // ...
+      // (14) utime  %lu : time spent in user mode
+      // (15) stime  %lu : time spent in kernel mode
+      // (16) cutime %ld : time spent waiting for children in user mode
+      // (17) cstime %ld : time spent waiting for children in kernel mode
+      // ...
+      char process_state;
+      unsigned long utime_ticks, stime_ticks;
+      long cutime_ticks, cstime_ticks;
+      fscanf(fp,
+             "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " // 1-13
+             "%lu %lu %ld %ld", // 14-17
+             &process_state, &utime_ticks, &stime_ticks, &cutime_ticks,
+             &cstime_ticks);
+      fclose(fp);
+
+      if (process_state != 'Z') {
+        temp_pid = atoi(curr_dir_ptr->d_name);
+        process_list->processes[process_list->size].process_id = temp_pid;
+        process_list->processes[process_list->size].utime = utime_ticks;
+        process_list->processes[process_list->size].stime = stime_ticks;
+        process_list->processes[process_list->size].cutime = cutime_ticks;
+        process_list->processes[process_list->size].cstime = cstime_ticks;
+        process_list->processes[process_list->size].ttime =
+            utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+        // Try to find the PID in the previous list
+        while (i < prev_process_list->size &&
+               prev_process_list->processes[i].process_id < temp_pid) {
+          i++;
+        }
+        // The PID is not in the original list
+        if (i == prev_process_list->size ||
+            prev_process_list->processes[i].process_id != temp_pid) {
+          process_list->processes[process_list->size].cpu_utilization =
+              (float)process_list->processes[process_list->size].ttime /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+        // The PID is in the original list
+        } else {
+          process_list->processes[process_list->size].cpu_utilization =
+              (float)(process_list->processes[process_list->size].ttime -
+                      prev_process_list->processes[i].ttime) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+        }
+        process_list->size++;
+      }
+    }
+  }
+
+  (void)closedir(dir_ptr);
+}
+
+void swap_process_list(process_list_t** process_list_a,
+                       process_list_t** process_list_b) {
+  process_list_t* temp;
+  temp = *process_list_a;
+  *process_list_a = *process_list_b;
+  *process_list_b = temp;
+}
 
 void print_process_info(process_list_t* process_list) {
   int i;
+  printf("Size: %zd, CPU total time: %lu\n",
+         process_list->size, process_list->cpu_total_time);
   for (i = 0; i < process_list->size; i++) {
-    printf("%d - PID: %d\n", i, process_list->processes[i].process_id);
+    printf("  PID: %u, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
+           "ttime: %lu, cpu_utilization: %f\n",
+           process_list->processes[i].process_id,
+           process_list->processes[i].utime,
+           process_list->processes[i].stime,
+           process_list->processes[i].cutime,
+           process_list->processes[i].cstime,
+           process_list->processes[i].ttime,
+           process_list->processes[i].cpu_utilization);
   }
-}
-
-void get_process_info(process_list_t* process_list, int num_iterations) {
-  DIR* dir_ptr;
-  FILE *fp;
-  struct dirent* curr_dir_ptr;
-  char pid_stat_location[30]; 
-  int i;
-  int shift_counter;
-  int temp_pid;
-  bool next_pid=true;
-  size_t size_previous_iteration;
-  char check_if_zombie;
-
-  long unsigned int cpu_total_time_after;
-  long unsigned int temp_cpu_total_time[7];
-  long unsigned int utime_ticks_after;
-  long unsigned int stime_ticks_after;
-  long unsigned int cutime_ticks_after;
-  long unsigned int cstime_ticks_after;
-
-  strcpy(pid_stat_location,"/proc");
-  strcat(pid_stat_location, "/stat");
-  fp = fopen(pid_stat_location, "r");
-  if(fp == NULL){
-    perror("Stat File for PID does not exist \n");
-  }
-  printf("num_iterations %d \n", num_iterations);
-  
-  fscanf(fp, "%*s %lu %lu %lu %lu %lu %lu %lu",&temp_cpu_total_time[0], 
-  &temp_cpu_total_time[1], &temp_cpu_total_time[2], &temp_cpu_total_time[3], 
-  &temp_cpu_total_time[4], &temp_cpu_total_time[5], &temp_cpu_total_time[6]);
-  fclose(fp);
-  
-  cpu_total_time_after=0;
-  for(i=0; i<7; i++)
-    cpu_total_time_after = cpu_total_time_after + temp_cpu_total_time[i];  
-
-  dir_ptr = opendir("/proc/");
-  if (dir_ptr == NULL) {
-    perror("Cound not open directory /proc/.");
-    return;
-  }
-  size_previous_iteration = process_list->size;
-  process_list->size = 0;
-  while (true) {
-    if(next_pid) {
-      curr_dir_ptr = readdir(dir_ptr);
-      if(curr_dir_ptr == NULL)
-        break;
-    }
-    if (curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
-      memset(&pid_stat_location[0], 0, sizeof(pid_stat_location));
-      if (process_list->size >= MAX_NUM_PROCESSES) {
-        perror("Too many processes.");
-        return;
-      }
-      
-      strcpy(pid_stat_location,"/proc/");
-      strcat(pid_stat_location, curr_dir_ptr->d_name);
-      strcat(pid_stat_location, "/stat");
-
-      fp = fopen(pid_stat_location, "r");
-      if(fp == NULL){
-        perror("Stat File for PID does not exist \n");
-      }
-      fscanf(fp, "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu"
-        "%lu %lu", &check_if_zombie, &utime_ticks_after, &stime_ticks_after, 
-        &cutime_ticks_after, &cstime_ticks_after);
-      fclose(fp);
-      //printf("%c\n", check_if_zombie);
-      if(check_if_zombie == 'Z') {
-        if(num_iterations == 1) { 
-          // During the first iteration profile for all values
-          process_list->processes[process_list->size].process_id =
-              atoi(curr_dir_ptr->d_name);
-          process_list->processes[process_list->size].cpu_utilization =
-              ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - 
-              process_list->processes[process_list->size].user_time - 
-              process_list->processes[process_list->size].cuser_time  ) 
-              / (cpu_total_time_after - process_list->cpu_total_time)) + 
-              ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - 
-              process_list->processes[process_list->size].system_time - 
-              process_list->processes[process_list->size].csystem_time  ) 
-              / (cpu_total_time_after - process_list->cpu_total_time));
-
-          process_list->processes[process_list->size].user_time =
-            utime_ticks_after;
-          process_list->processes[process_list->size].system_time =
-            stime_ticks_after;
-          process_list->processes[process_list->size].cuser_time =
-            cutime_ticks_after;
-          process_list->processes[process_list->size].csystem_time =
-            cstime_ticks_after;
-          if(process_list->processes[process_list->size].cpu_utilization > 1) {
-             printf("PID of that process is %d and utilization is %f\n", 
-               process_list->processes[process_list->size].process_id, 
-               process_list->processes[process_list->size].cpu_utilization );
-          }
-          process_list->size++;
-        } else {
-          //Non first iterations
-          temp_pid = atoi(curr_dir_ptr->d_name);
-          if(temp_pid == process_list->processes[process_list->size].process_id || process_list->processes[process_list->size].process_id == 0 ) {
-          //If the pid at that entry in the queue has not changed!!
-          process_list->processes[process_list->size].cpu_utilization =
-              ( 100 * (float)  (utime_ticks_after + cutime_ticks_after - 
-              process_list->processes[process_list->size].user_time - 
-              process_list->processes[process_list->size].cuser_time  ) 
-              / (cpu_total_time_after - process_list->cpu_total_time)) + 
-              ( 100 * (float)  (stime_ticks_after + cstime_ticks_after - 
-              process_list->processes[process_list->size].system_time - 
-              process_list->processes[process_list->size].csystem_time  ) 
-              / (cpu_total_time_after - process_list->cpu_total_time));
-            process_list->processes[process_list->size].user_time =
-              utime_ticks_after;
-            process_list->processes[process_list->size].system_time =
-              stime_ticks_after;
-            process_list->processes[process_list->size].cuser_time =
-              cutime_ticks_after;
-            process_list->processes[process_list->size].csystem_time =
-              cstime_ticks_after;
-
-            if(process_list->processes[process_list->size].cpu_utilization > 1)
-               printf("PID of that process is %d and utilization is %f\n", 
-               process_list->processes[process_list->size].process_id, 
-               process_list->processes[process_list->size].cpu_utilization );
-            process_list->size++;
-            next_pid = true;
-            
-          } else if (temp_pid < process_list->processes[process_list->size].process_id ) {
-            //New PID has been included
-              for(shift_counter = size_previous_iteration; shift_counter >= process_list->size; shift_counter--) {
-                process_list->processes[shift_counter + 1] = 
-                   process_list->processes[shift_counter];
-              }
-            process_list->processes[process_list->size].process_id =
-              temp_pid;
-            process_list->processes[process_list->size].user_time =
-              utime_ticks_after;
-            process_list->processes[process_list->size].system_time =
-              stime_ticks_after;
-            process_list->processes[process_list->size].cuser_time =
-              cutime_ticks_after;
-            process_list->processes[process_list->size].csystem_time =
-              cstime_ticks_after;
-             
-            next_pid = true;
-            process_list->size++;
-          } else if (temp_pid > process_list->processes[process_list->size].process_id ) {
-            //Old PID has been deleted
-              for(shift_counter = process_list->size; shift_counter < size_previous_iteration; ++shift_counter){
-                process_list->processes[shift_counter] = 
-                  process_list->processes[shift_counter + 1];
-            }
-                process_list->processes[size_previous_iteration].process_id = 0;
-            next_pid = false;
-          } else {
-            printf("Something wrong happened \n");
-            exit(0);
-            //It should technically not come here. Have been tested and seems to be fine.
-          }
-
-        }// else loop for iterations after the first one
-      } // loop to check if it is zombie
-    }// if loop for directory pids
-  } // main while loop
-  process_list->cpu_total_time = cpu_total_time_after;
-
-  (void)closedir(dir_ptr);
 }

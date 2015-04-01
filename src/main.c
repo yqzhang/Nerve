@@ -48,7 +48,6 @@ static void usage(void) {
 
 int main(int argc, char** argv) {
   int c;
-  int num_iterations=1;
 
   setlocale(LC_ALL, "");
 
@@ -74,6 +73,8 @@ int main(int argc, char** argv) {
         errx(1, "unknown error");
     }
   }
+
+  // TODO: Read this from configuration file
   if (options.num_groups == 0) {
     options.events[0] = "cycles,instructions";
     options.num_groups = 1;
@@ -81,15 +82,25 @@ int main(int argc, char** argv) {
 
   signal(SIGINT, sig_handler);
 
-  process_list_t process_info_list;
+  // Create an array so that we can keep reusing them
+  process_list_t process_info_array[3];
+  process_list_t* process_info_list = &process_info_array[0];
+  process_list_t* prev_process_info_list = &process_info_array[1];
+  process_list_t* filtered_process_info_list = &process_info_array[2];
 
   while (true) {
-    get_process_info(&process_info_list,num_iterations);
-    //print_process_info(&process_info_list);
-    //get_pmu_sample(&process_info_list, options.events, 1e6);
-    sleep(2);
-    ++num_iterations;
-    printf("****************\n");
+    // Sample all the running processes, and calculate their utilization
+    // information in the last sample interval
+    get_process_info(process_info_list, prev_process_info_list);
+
+    // Filter the list of processes by a list of thresholds
+    // TODO:
+
+    // Profile all the PMU events of all the processes in the list,
+    // and sleep for the same time as sample interval
+    get_pmu_sample(&process_info_list, options.events, 1e6);
+
+    swap_process_list(&process_info_list, &prev_process_info_list);
   }
 
   return 0;
