@@ -3,4 +3,4 @@ language: c
 compiler:
   - gcc
 
-script: ./scripts/install_ubuntu_14.04.sh
+script: sudo ./scripts/install_ubuntu_14.04.sh
