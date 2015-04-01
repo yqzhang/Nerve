@@ -4,7 +4,7 @@ PERF_EVENT_HDR = /usr/local/include/perfmon/
 PFMLIB         = -lpfm
 
 INCLUDES       = -I . -I $(PERF_EVENT_HDR)
-LIBS           = -pthread $(PFMLIB)
+LIBS           = -pthread -ljansson $(PFMLIB)
 
 CFLAGS         = -Wall -D_GNU_SOURCE $(INCLUDES)
 
