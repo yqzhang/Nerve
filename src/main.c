@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   process_list_t process_info_array[3];
   process_list_t* process_info_list = &process_info_array[0];
   process_list_t* prev_process_info_list = &process_info_array[1];
-  process_list_t* filtered_process_info_list = &process_info_array[2];
+  // process_list_t* filtered_process_info_list = &process_info_array[2];
 
   while (true) {
     // Sample all the running processes, and calculate their utilization
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval
-    get_pmu_sample(&process_info_list, options.events, 1e6);
+    get_pmu_sample(process_info_list, options.events, 1e6);
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }

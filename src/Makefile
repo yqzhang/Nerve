@@ -23,6 +23,9 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $? $(LIBS)
 
+%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
 .PHONY: clean
 
 clean:
