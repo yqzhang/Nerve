@@ -30,7 +30,7 @@ typedef struct application_list {
 typedef enum {
   SNOOP_CMD_RESET = 0x00,
   SNOOP_CMD_PERF = 0x01,
-} snoop_command;
+} snoop_command_t;
 
 typedef struct snoop_request {
   short snoop_command;
@@ -40,11 +40,11 @@ typedef struct snoop_request {
 typedef enum {
   SNOOP_REPLY_SUCCESS = 0x00,
   SNOOP_REPLY_ERROR = 0x01,
-} snoop_reply_code;
+} snoop_reply_code_t;
 
 typedef struct snoop_reply {
   // return code
-  short reply_code;
+  short snoop_reply_code;
   // total number of requests that have been sent
   unsigned long num_of_reuqests;
   // tail latency of the sent requests microseconds
