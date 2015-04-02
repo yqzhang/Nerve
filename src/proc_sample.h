@@ -14,9 +14,6 @@
 #include <sys/types.h>
 
 #define MAX_NUM_PROCESSES 512
-/*
-Max processes can only be 511
-*/
 
 typedef struct process {
   unsigned int process_id;
