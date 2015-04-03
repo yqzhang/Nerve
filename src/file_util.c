@@ -10,6 +10,8 @@
 
 #include "file_util.h"
 
+#include "log_util.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,8 +19,7 @@
 void read_file(char* filename, char* read_buffer, unsigned int buffer_size) {
   FILE* fp = fopen(filename, "rb");
   if (fp == NULL) {
-    fprintf(stderr, "Error opening file %s.\n", filename);
-    exit(1);
+    logging(LOG_CODE_FATAL, "Error opening file %s.\n", filename);
   }
 
   fread(read_buffer, buffer_size, 1, fp);
@@ -39,8 +40,7 @@ void write_file(char* filename, char* write_buffer, unsigned int size,
   }
 
   if (fp == NULL) {
-    fprintf(stderr, "Error openning file %s.\n", filename);
-    exit(1);
+    logging(LOG_CODE_FATAL, "Error openning file %s.\n", filename);
   }
 
   fwrite(write_buffer, 1, sizeof(char), fp);

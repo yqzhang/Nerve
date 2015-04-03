@@ -10,6 +10,8 @@
 
 #include "pmu_sample.h"
 
+#include "log_util.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,18 +46,19 @@ void read_groups(perf_event_desc_t* fds, int num) {
     }
 
     if (!values) {
-      err(1, "cannot allocate memory for values\n");
+      logging(LOG_CODE_FATAL, "cannot allocate memory for values\n");
     }
 
     ret = read(fds[evt].fd, values, new_sz);
     if (ret != (ssize_t)new_sz) {/* unsigned */
       if (ret == -1) {
-        err(1, "cannot read values event %s", fds[evt].name);
+        logging(LOG_CODE_FATAL, "cannot read values event %s", fds[evt].name);
       }
 
       /* likely pinned and could not be loaded */
-      warnx("could not read event %d, tried to read %zu bytes, but got %zd",
-            evt, new_sz, ret);
+      logging(LOG_CODE_WARNING,
+              "could not read event %d, tried to read %zu bytes, but got %zd",
+              evt, new_sz, ret);
     }
 
     /*
@@ -97,9 +100,9 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
       ret = read(fds[proc_index][fds_index].fd, values, sizeof(values));
       if (ret < (ssize_t)sizeof(values)) {
         if (ret == -1) {
-          err(1, "cannot read results: %s", "strerror(errno)");
+          logging(LOG_CODE_FATAL, "cannot read results: %s", "strerror(errno)");
         } else {
-          warnx("could not read event%d", fds_index);
+          logging(LOG_CODE_WARNING, "could not read event%d", fds_index);
         }
       }
       /*
@@ -130,7 +133,7 @@ void get_pmu_sample(process_list_t* process_info_list,
    */
   ret = pfm_initialize();
   if (ret != PFM_SUCCESS) {
-    errx(1, "Cannot initialize library: %s", pfm_strerror(ret));
+    logging(LOG_CODE_FATAL, "Cannot initialize library: %s", pfm_strerror(ret));
   }
 
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
@@ -139,7 +142,7 @@ void get_pmu_sample(process_list_t* process_info_list,
     fds[proc_index] = NULL;
     ret = perf_setup_argv_events(events, &(fds[proc_index]), &num_fds);
     if (ret || !num_fds) {
-      errx(1, "cannot setup events");
+      logging(LOG_CODE_FATAL, "cannot setup events");
     }
 
     fds[proc_index][0].fd = -1;
@@ -152,7 +155,7 @@ void get_pmu_sample(process_list_t* process_info_list,
       fds[proc_index][fds_index].fd = perf_event_open(
           &fds[proc_index][fds_index].hw, proc_info[proc_index][0], -1, -1, 0);
       if (fds[proc_index][fds_index].fd == -1) {
-        err(1, "cannot open event %d", fds_index);
+        logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
       }
     }
   }
@@ -162,7 +165,7 @@ void get_pmu_sample(process_list_t* process_info_list,
    */
   ret = prctl(PR_TASK_PERF_EVENTS_ENABLE);
   if (ret) {
-    err(1, "prctl(enable) failed");
+    logging(LOG_CODE_FATAL, "prctl(enable) failed");
   }
 
   usleep(sample_interval);
@@ -173,7 +176,7 @@ void get_pmu_sample(process_list_t* process_info_list,
    * disable all counters attached to this thread
    */
   ret = prctl(PR_TASK_PERF_EVENTS_DISABLE);
-  if (ret) err(1, "prctl(disable) failed");
+  if (ret) logging(LOG_CODE_FATAL, "prctl(disable) failed");
 
   for (proc_index = 0; proc_index < process_info_list->size; ++proc_index) {
     for (fds_index = 0; fds_index < num_fds; fds_index++)

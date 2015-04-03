@@ -13,7 +13,8 @@ SRCS = main.c \
        pmu_sample.c \
        proc_sample.c \
        app_sample.c \
-       file_util.c
+       file_util.c \
+       log_util.c
 
 OBJS = $(SRCS:.c=.o)
 

@@ -10,6 +10,8 @@
 
 #include "app_sample.h"
 
+#include "log_util.h"
+
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,13 +30,11 @@ int init_app_sample(char** hostnames, unsigned int* ports,
   for (i = 0; i < num_applications; i++) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-      fprintf(stderr, "Error opening socket.\n");
-      exit(1);
+      logging(LOG_CODE_FATAL, "Error opening socket.\n");
     }
     struct hostent* server = gethostbyname(hostnames[i]);
     if (server == NULL) {
-      fprintf(stderr, "Error finding host %s.\n", hostnames[i]);
-      exit(1);
+      logging(LOG_CODE_FATAL, "Error finding host %s.\n", hostnames[i]);
     }
     struct sockaddr_in server_addr;
     bzero((char *)&server_addr, sizeof(struct sockaddr_in));
@@ -45,9 +45,8 @@ int init_app_sample(char** hostnames, unsigned int* ports,
     server_addr.sin_port = htons(ports[i]);
     if (connect(sockfd, (struct sockaddr *)&server_addr,
                 sizeof(struct sockaddr_in)) < 0) {
-      fprintf(stderr, "Error connecting to host %s at port %d.\n",
+      logging(LOG_CODE_FATAL, "Error connecting to host %s at port %d.\n",
               hostnames[i], ports[i]);
-      exit(1);
     }
 
     // Record the values in application_list
@@ -61,9 +60,8 @@ int init_app_sample(char** hostnames, unsigned int* ports,
     snoop_reply_t reply;
     send_request(sockfd, SNOOP_CMD_RESET, &reply);
     if (reply.snoop_reply_code == SNOOP_REPLY_ERROR) {
-      fprintf(stderr, "Error resetting statistics on %s:%d.\n",
+      logging(LOG_CODE_FATAL, "Error resetting statistics on %s:%d.\n",
               hostnames[i], ports[i]);
-      exit(1);
     }
   }
 
@@ -84,10 +82,9 @@ void get_app_sample() {
     send_request(application_list.applications[i].sockfd, SNOOP_CMD_RESET,
                  &snoop_reply);
     if (snoop_reply.snoop_reply_code == SNOOP_REPLY_ERROR) {
-      fprintf(stderr, "Error resetting statistics on %s:%d.\n",
+      logging(LOG_CODE_FATAL, "Error resetting statistics on %s:%d.\n",
               application_list.applications[i].hostname,
               application_list.applications[i].port);
-      exit(1);
     }
   }
 }
@@ -104,12 +101,10 @@ void send_request(int sockfd, short snoop_command, snoop_reply_t* reply) {
   request.snoop_command = snoop_command;
   int n = write(sockfd, (char *)&request, sizeof(snoop_request_t));
   if (n < 0) {
-    fprintf(stderr, "Error writing to socket.\n");
-    exit(1);
+    logging(LOG_CODE_FATAL, "Error writing to socket.\n");
   }
   n = read(sockfd, (char *)&reply, sizeof(snoop_reply_t));
   if (n < 0) {
-    fprintf(stderr, "Error reading from socket.\n");
-    exit(1);
+    logging(LOG_CODE_FATAL, "Error reading from socket.\n");
   }
 }

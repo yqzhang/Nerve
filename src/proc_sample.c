@@ -10,6 +10,8 @@
 
 #include "proc_sample.h"
 
+#include "log_util.h"
+
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -26,8 +28,7 @@ void get_process_info(process_list_t* process_list,
   FILE *fp;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
-    fprintf(stderr, "Stat File %s does not exist.\n", pid_stat_location);
-    exit(1);
+    logging(LOG_CODE_FATAL, "Stat File %s does not exist.\n", pid_stat_location);
   }
   unsigned long temp_cpu_total_time[7];
   fscanf(fp, "%*s %lu %lu %lu %lu %lu %lu %lu",
@@ -49,8 +50,7 @@ void get_process_info(process_list_t* process_list,
   // processes
   DIR* dir_ptr = opendir("/proc/");
   if (dir_ptr == NULL) {
-    fprintf(stderr, "Cound not open directory /proc/.");
-    exit(1);
+    logging(LOG_CODE_FATAL, "Cound not open directory /proc/.");
   }
 
   int temp_pid;
@@ -58,8 +58,8 @@ void get_process_info(process_list_t* process_list,
   while ((curr_dir_ptr = readdir(dir_ptr)) != NULL) {
     if (curr_dir_ptr->d_name[0] >= '0' && curr_dir_ptr->d_name[0] <= '9') {
       if (process_list->size >= MAX_NUM_PROCESSES) {
-        fprintf(stderr, "Too many processes (max: %d).", MAX_NUM_PROCESSES);
-        exit(1);
+        logging(LOG_CODE_FATAL, "Too many processes (max: %d).",
+                MAX_NUM_PROCESSES);
       }
       sprintf(pid_stat_location, "/proc/%s/stat", curr_dir_ptr->d_name);
       fp = fopen(pid_stat_location, "r");

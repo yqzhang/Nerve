@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "app_sample.h"
+#include "log_util.h"
 #include "pmu_sample.h"
 #include "proc_sample.h"
 
@@ -61,7 +62,8 @@ int main(int argc, char** argv) {
         if (options.num_groups < MAX_GROUPS) {
           options.events[options.num_groups++] = optarg;
         } else {
-          errx(1, "you cannot specify more than %d groups.\n", MAX_GROUPS);
+          logging(LOG_CODE_FATAL, "you cannot specify more than %d groups.\n",
+                  MAX_GROUPS);
         }
         break;
       case 'p':
@@ -74,7 +76,7 @@ int main(int argc, char** argv) {
         usage();
         exit(0);
       default:
-        errx(1, "unknown error");
+        logging(LOG_CODE_FATAL, "unknown error");
     }
   }
 
