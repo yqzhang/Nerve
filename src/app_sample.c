@@ -74,8 +74,19 @@ void get_app_sample() {
   int i = 0;
   snoop_reply_t snoop_reply;
   for (i = 0; i < application_list.size; i++) {
+    // Snoop the performance statistics
     send_request(application_list.applications[i].sockfd, SNOOP_CMD_PERF,
                  &snoop_reply);
+
+    // TODO: Do something with the reply here
+
+    // Reset the statistics
+    send_request(sockfd, SNOOP_CMD_RESET, &reply);
+    if (reply.snoop_reply_code == SNOOP_REPLY_ERROR) {
+      fprintf(stderr, "Error resetting statistics on %s:%d.\n",
+              hostnames[i], ports[i]);
+      exit(1);
+    }
   }
 }
 
