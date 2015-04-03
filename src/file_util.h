@@ -11,8 +11,10 @@
 #ifndef __FILE_UTIL__
 #define __FILE_UTIL__
 
-void read_file();
+#include <stdbool.h>
 
-void write_file();
+void read_file(char* filename, char* read_buffer, unsigned int buffer_size);
+
+void write_file(char* filename, char* write_buffer, unsigned int size, bool append);
 
 #endif
