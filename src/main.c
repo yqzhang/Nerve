@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "app_sample.h"
 #include "pmu_sample.h"
 #include "proc_sample.h"
 
@@ -25,6 +26,9 @@ typedef struct {
   int num_groups;
   int print;
   int pin;
+  char* hostnames[MAX_NUM_APPLICATIONS];
+  unsigned int ports[MAX_NUM_APPLICATIONS];
+  int num_applications;
 } options_t;
 
 options_t options;
@@ -79,6 +83,9 @@ int main(int argc, char** argv) {
     options.events[0] = "cycles,instructions";
     options.num_groups = 1;
   }
+  options.hostnames[0] = "localhost";
+  options.ports[0] = 1234;
+  options.num_applications = 1;
 
   signal(SIGINT, sig_handler);
 
@@ -87,6 +94,9 @@ int main(int argc, char** argv) {
   process_list_t* process_info_list = &process_info_array[0];
   process_list_t* prev_process_info_list = &process_info_array[1];
   process_list_t* filtered_process_info_list = &process_info_array[2];
+
+  // Initialize the application sampling
+  init_app_sample(options.hostnames, options.ports, options.num_applications);
 
   while (true) {
     // Sample all the running processes, and calculate their utilization
@@ -101,8 +111,14 @@ int main(int argc, char** argv) {
     get_pmu_sample(filtered_process_info_list, (const char**)options.events,
                    1e6);
 
+    // Get performance statistics from the applications
+    get_app_sample();
+
     swap_process_list(&process_info_list, &prev_process_info_list);
   }
+
+  // Clean up application sampling
+  clean_app_sample();
 
   return 0;
 }

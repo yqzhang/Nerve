@@ -59,4 +59,6 @@ void get_app_sample();
 
 void clean_app_sample();
 
+void send_request(int sockfd, short snoop_command, snoop_reply_t* reply);
+
 #endif
