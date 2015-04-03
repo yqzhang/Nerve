@@ -81,10 +81,12 @@ void get_app_sample() {
     // TODO: Do something with the reply here
 
     // Reset the statistics
-    send_request(sockfd, SNOOP_CMD_RESET, &reply);
-    if (reply.snoop_reply_code == SNOOP_REPLY_ERROR) {
+    send_request(application_list.applications[i].sockfd, SNOOP_CMD_RESET,
+                 &snoop_reply);
+    if (snoop_reply.snoop_reply_code == SNOOP_REPLY_ERROR) {
       fprintf(stderr, "Error resetting statistics on %s:%d.\n",
-              hostnames[i], ports[i]);
+              application_list.applications[i].hostname,
+              application_list.applications[i].port);
       exit(1);
     }
   }
