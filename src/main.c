@@ -21,7 +21,7 @@
 #include "proc_sample.h"
 
 typedef struct {
-  const char* events[MAX_GROUPS];
+  char* events[MAX_GROUPS];
   int num_groups;
   int print;
   int pin;
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   process_list_t process_info_array[3];
   process_list_t* process_info_list = &process_info_array[0];
   process_list_t* prev_process_info_list = &process_info_array[1];
-  // process_list_t* filtered_process_info_list = &process_info_array[2];
+  process_list_t* filtered_process_info_list = &process_info_array[2];
 
   while (true) {
     // Sample all the running processes, and calculate their utilization
@@ -94,11 +94,12 @@ int main(int argc, char** argv) {
     get_process_info(process_info_list, prev_process_info_list);
 
     // Filter the list of processes by a list of thresholds
-    // TODO:
+    filter_process_info(process_info_list, filtered_process_info_list, 0.15);
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval
-    get_pmu_sample(process_info_list, options.events, 1e6);
+    get_pmu_sample(filtered_process_info_list, (const char**)options.events,
+                   1e6);
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }

@@ -19,6 +19,7 @@
 typedef struct application {
   char hostname[MAX_HOSTNAME_LENGTH];
   unsigned int port;
+  int sockfd;
 } application_t;
 
 typedef struct application_list {
@@ -50,5 +51,12 @@ typedef struct snoop_reply {
   // tail latency of the sent requests microseconds
   double tail_latency;
 } snoop_reply_t;
+
+int init_app_sample(char** hostnames, unsigned int* ports,
+                    unsigned int num_applications);
+
+void get_app_sample();
+
+void clean_app_sample();
 
 #endif

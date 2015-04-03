@@ -11,7 +11,7 @@
 #include "proc_sample.h"
 
 #include <dirent.h>
-#include <stdbool.h> 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,6 +123,23 @@ void get_process_info(process_list_t* process_list,
   }
 
   (void)closedir(dir_ptr);
+}
+
+void filter_process_info(process_list_t* process_info_list,
+                         process_list_t* filtered_process_info_list,
+                         float filter_by_cpu_utilization) {
+  filtered_process_info_list->cpu_total_time =
+      process_info_list->cpu_total_time;
+  filtered_process_info_list->size = 0;
+  int i;
+  for (i = 0; i < process_info_list->size; i++) {
+    if (process_info_list->processes[i].cpu_utilization >=
+        filter_by_cpu_utilization) {
+      filtered_process_info_list->processes[filtered_process_info_list->size] =
+          process_info_list->processes[i];
+      filtered_process_info_list->size++;
+    }
+  }
 }
 
 void swap_process_list(process_list_t** process_list_a,
