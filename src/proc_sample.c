@@ -104,7 +104,7 @@ void get_process_info(process_list_t* process_list,
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
         process_list->processes[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
-                                   sysconf(_SC_PAGESIZE));
+                                  sysconf(_SC_PAGESIZE));
         process_list->processes[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
 	
