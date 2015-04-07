@@ -85,7 +85,7 @@ void get_process_info(process_list_t* process_list,
       long cutime_ticks, cstime_ticks;
       fscanf(fp,
              "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " // 1-13
-             "%lu %lu %ld %ld %*d %*d %*d %*d %*u %*u %ld", // 14-17
+             "%lu %lu %ld %ld %*d %*d %*d %*d %*u %*u %ld", // 14-24
              &process_state, &utime_ticks, &stime_ticks, &cutime_ticks,
              &cstime_ticks, &num_pages);
       fclose(fp);
