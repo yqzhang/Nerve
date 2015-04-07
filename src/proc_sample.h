@@ -14,8 +14,6 @@
 #include <sys/types.h>
 
 #define MAX_NUM_PROCESSES 512
-#define MEMORY_SIZE 32768
-#define PAGE_TABLE_SIZE 4
 
 typedef struct process {
   unsigned int process_id;
@@ -25,7 +23,8 @@ typedef struct process {
   unsigned long cstime;
   unsigned long ttime;
   float cpu_utilization;
-  float mem_utilization;
+  float virtual_mem_utilization;
+  float real_mem_utilization;
 } process_t;
 
 typedef struct process_list {

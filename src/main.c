@@ -97,8 +97,8 @@ int main(int argc, char** argv) {
   process_list_t* prev_process_info_list = &process_info_array[1];
   process_list_t* filtered_process_info_list = &process_info_array[2];
 
-  // Initialize the application sampling
-  init_app_sample(options.hostnames, options.ports, options.num_applications);
+  // FIXME: Initialize the application sampling
+  // init_app_sample(options.hostnames, options.ports, options.num_applications);
 
   while (true) {
     // Sample all the running processes, and calculate their utilization
@@ -113,14 +113,14 @@ int main(int argc, char** argv) {
     get_pmu_sample(filtered_process_info_list, (const char**)options.events,
                    1e6);
 
-    // Get performance statistics from the applications
-    get_app_sample();
+    // FIXME: Get performance statistics from the applications
+    // get_app_sample();
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }
 
-  // Clean up application sampling
-  clean_app_sample();
+  // FIXME: Clean up application sampling
+  // clean_app_sample();
 
   return 0;
 }

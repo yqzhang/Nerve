@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 void get_process_info(process_list_t* process_list,
                       process_list_t* prev_process_list) {
@@ -68,8 +69,8 @@ void get_process_info(process_list_t* process_list,
         continue;
       }
 
-      // Read /proc/*/stat for the CPU utilization information of specific PIDs
-      // Mem utilization - percentage of main memory used by your process
+      // Read /proc/*/stat for the CPU and memory utilization information of
+      // specific PIDs
       // file format: http://man7.org/linux/man-pages/man5/proc.5.html
       // ...
       // (3)  state  %c  : indicates process state
@@ -78,16 +79,18 @@ void get_process_info(process_list_t* process_list,
       // (15) stime  %lu : time spent in kernel mode
       // (16) cutime %ld : time spent waiting for children in user mode
       // (17) cstime %ld : time spent waiting for children in kernel mode
-      // (24) rss    %ld : the number of pages that the process has in main memory 
+      // ...
+      // (23) vsize  %lu : virtual memory size in bytes
+      // (24) rss    %ld : number of pages that the process has in main memory 
       // ...
       char process_state;
-      unsigned long utime_ticks, stime_ticks,num_pages;
-      long cutime_ticks, cstime_ticks;
+      unsigned long utime_ticks, stime_ticks, vsize_bytes;
+      long cutime_ticks, cstime_ticks, rss_pages;
       fscanf(fp,
              "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " // 1-13
-             "%lu %lu %ld %ld %*d %*d %*d %*d %*u %*u %ld", // 14-24
+             "%lu %lu %ld %ld %*d %*d %*d %*d %*u %lu %ld", // 14-24
              &process_state, &utime_ticks, &stime_ticks, &cutime_ticks,
-             &cstime_ticks, &num_pages);
+             &cstime_ticks, &vsize_bytes, &rss_pages);
       fclose(fp);
 
       if (process_state != 'Z') {
@@ -99,8 +102,11 @@ void get_process_info(process_list_t* process_list,
         process_list->processes[process_list->size].cstime = cstime_ticks;
         process_list->processes[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
-        process_list->processes[process_list->size].mem_utilization =
-            ( num_pages * PAGE_TABLE_SIZE ) / MEMORY_SIZE;
+        process_list->processes[process_list->size].virtual_mem_utilization =
+            (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
+                                   sysconf(_SC_PAGESIZE));
+        process_list->processes[process_list->size].real_mem_utilization =
+            (float)rss_pages / sysconf(_SC_PHYS_PAGES);
 	
         // Try to find the PID in the previous list
         while (i < prev_process_list->size &&
@@ -161,7 +167,8 @@ void print_process_info(process_list_t* process_list) {
          process_list->size, process_list->cpu_total_time);
   for (i = 0; i < process_list->size; i++) {
     printf("  PID: %u, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
-           "ttime: %lu, cpu_utilization: %f, mem_utilization: %f\n",
+           "ttime: %lu, cpu_utilization: %f, virtial_mem_utilization: %f, "
+           "real_mem_utilization: %f\n",
            process_list->processes[i].process_id,
            process_list->processes[i].utime,
            process_list->processes[i].stime,
@@ -169,6 +176,7 @@ void print_process_info(process_list_t* process_list) {
            process_list->processes[i].cstime,
            process_list->processes[i].ttime,
            process_list->processes[i].cpu_utilization,
-           process_list->processes[i].mem_utilization);
+           process_list->processes[i].virtual_mem_utilization,
+           process_list->processes[i].real_mem_utilization);
   }
 }
