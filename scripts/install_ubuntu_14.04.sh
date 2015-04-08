@@ -17,4 +17,6 @@ tar -xvf jansson-2.7.tar.gz
 cd jansson-2.7 && ./configure && make && sudo make install && cd ..
 rm -rf jansson-2.7 jansson-2.7.tar.gz
 
+sudo ldconfig
+
 cd src/ && make

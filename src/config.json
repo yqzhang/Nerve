@@ -1,0 +1,16 @@
+{
+  "application": {
+    "memcached": {
+      "hostname": "localhost",
+      "port": 1234
+    },
+    "mcrouter": {
+      "hostname": "localhost",
+      "port": 2345
+    }
+  },
+  "pmu": [
+    "cycles",
+    "instructions"
+  ]
+}

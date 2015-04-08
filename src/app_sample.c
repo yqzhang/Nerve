@@ -22,7 +22,7 @@
 
 application_list_t application_list;
 
-int init_app_sample(char** hostnames, unsigned int* ports,
+int init_app_sample(const char** hostnames, unsigned int* ports,
                     unsigned int num_applications) {
   application_list.size = 0;
 

@@ -52,7 +52,7 @@ typedef struct snoop_reply {
   double tail_latency;
 } snoop_reply_t;
 
-int init_app_sample(char** hostnames, unsigned int* ports,
+int init_app_sample(const char** hostnames, unsigned int* ports,
                     unsigned int num_applications);
 
 void get_app_sample();
