@@ -169,7 +169,7 @@ int main(int argc, char** argv) {
         options.config_file = optarg;
         break;
       default:
-        logging(LOG_CODE_FATAL, "unknown error");
+        logging(LOG_CODE_FATAL, "Unknown argument");
     }
   }
 
