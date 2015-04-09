@@ -14,7 +14,6 @@
 
 #include <fcntl.h>
 #include <inttypes.h>
-#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -28,13 +27,12 @@
 #define CPU_CLK_UNHALTED_REF 0x030b
 
 int num_of_cores;
-cpu_set_t all_core_mask;
 
-unsigned long long cycles[2][MAX_NUM_CORES];
+unsigned long long cycles[2];
 unsigned long long cpu_clk_unhalted_core[2][MAX_NUM_CORES];
 unsigned long long cpu_clk_unhalted_ref[2][MAX_NUM_CORES];
 
-struct timeval tvs[2][MAX_NUM_CORES];
+struct timeval tvs[2];
 
 // This function reads the raw cycle count on a core, which depends on the
 // core that this process is running on. Depending on the underlying
@@ -115,33 +113,26 @@ void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs,
                     unsigned long long* cpu_clk_unhalted_core,
                     unsigned long long* cpu_clk_unhalted_ref) {
   int i;
-  cpu_set_t mask;
+
+  // Record the time
+  gettimeofday(tvs, NULL);
+  // Get the cycle count
+  *cycles = rdtsc();
 
   for (i = 0; i < num_of_cores; i++) {
-    // Re-schedule the process to core i
-    CPU_ZERO(&mask);
-    CPU_SET(i, &mask);
-    sched_setaffinity(0, sizeof(cpu_set_t), &mask);
-    // Record the time
-    gettimeofday(&tvs[i], NULL);
-    // Get the cycle count
-    cycles[i] = rdtsc();
-
     cpu_clk_unhalted_core[i] = read_msr(i, CPU_CLK_UNHALTED_CORE, 63, 0);
     cpu_clk_unhalted_ref[i] = read_msr(i, CPU_CLK_UNHALTED_REF, 63, 0);
   }
-
-  // Reset the affinity back to free
-  sched_setaffinity(0, sizeof(cpu_set_t), &all_core_mask);
 }
 
 void estimate_frequency() {
   int i;
 
+  unsigned int microseconds =
+      (tvs[1].tv_sec - tvs[0].tv_sec) * MICROSECONDS +
+      (tvs[1].tv_usec - tvs[0].tv_usec);
+
   for (i = 0; i < num_of_cores; i++) {
-    unsigned int microseconds =
-        (tvs[1][i].tv_sec - tvs[0][i].tv_sec) * MICROSECONDS +
-        (tvs[1][i].tv_usec - tvs[0][i].tv_usec);
     unsigned long long delta_cpu_clk_unhalted_core, delta_cpu_clk_unhalted_ref;
     // Handle overflow for CPU_CLK_UNHALTED_CORE
     if (cpu_clk_unhalted_core[1][i] < cpu_clk_unhalted_core[0][i]) {
@@ -160,7 +151,7 @@ void estimate_frequency() {
           cpu_clk_unhalted_ref[1][i] - cpu_clk_unhalted_ref[0][i];
     }
     unsigned int frequency =
-        ((cycles[1][i] - cycles[0][i]) / microseconds) *
+        ((cycles[1] - cycles[0]) / microseconds) *
         ((double) delta_cpu_clk_unhalted_core / (double) delta_cpu_clk_unhalted_ref);
     logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
   }
@@ -169,13 +160,6 @@ void estimate_frequency() {
 void init_pmu_sample() {
   // Get the total number of cores available
   num_of_cores = sysconf(_SC_NPROCESSORS_ONLN);
-
-  // Prepare the mask for setting the process to all the cores
-  CPU_ZERO(&all_core_mask);
-  int i;
-  for (i = 0; i < num_of_cores; i++) {
-    CPU_SET(i, &all_core_mask);
-  }
 }
 
 void read_groups(perf_event_desc_t* fds, int num) {
@@ -330,12 +314,12 @@ void get_pmu_sample(process_list_t* process_info_list,
     logging(LOG_CODE_FATAL, "prctl(enable) failed");
   }
 
-  get_cpu_cycles(cycles[0], tvs[0], cpu_clk_unhalted_core[0],
+  get_cpu_cycles(&cycles[0], &tvs[0], cpu_clk_unhalted_core[0],
                  cpu_clk_unhalted_ref[0]);
 
   usleep(sample_interval);
 
-  get_cpu_cycles(cycles[1], tvs[1], cpu_clk_unhalted_core[1],
+  get_cpu_cycles(&cycles[1], &tvs[1], cpu_clk_unhalted_core[1],
                  cpu_clk_unhalted_ref[1]);
   estimate_frequency();
 
