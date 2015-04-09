@@ -13,8 +13,104 @@
 #include "log_util.h"
 
 #include <unistd.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+
+#define MAX_NUM_CORES 40
+
+#define MICROSECONDS 1000000
+
+int num_of_cores;
+cpu_set_t all_core_mask;
+
+unsigned long long cycles[2][MAX_NUM_CORES];
+
+struct timeval tvs[2][MAX_NUM_CORES];
+
+// This function reads the raw cycle count on a core, which depends on the
+// core that this process is running on. Depending on the underlying
+// architecture, the implementation varies:
+// http://www.mcs.anl.gov/~kazutomo/rdtsc.html
+#if defined(__i386__)
+__inline__ unsigned long long rdtsc() {
+  unsigned long long x;
+  __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+  return x;
+}
+
+#elif defined(__x86_64__)
+__inline__ unsigned long long rdtsc(void) {
+  unsigned hi, lo;
+  __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+  return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
+}
+
+#elif defined(__powerpc__)
+__inline__ unsigned long long rdtsc(void) {
+  unsigned long long int result = 0;
+  unsigned long int upper, lower, tmp;
+  __asm__ volatile(
+                "0:\n"
+                "\tmftbu   %0\n"
+                "\tmftb    %1\n"
+                "\tmftbu   %2\n"
+                "\tcmpw    %2,%0\n"
+                "\tbne     0b\n"
+                : "=r" (upper), "=r" (lower), "=r" (tmp)
+                );
+  result = upper;
+  result = result << 32;
+  result = result | lower;
+
+  return result;
+}
+#endif
+
+void init_pmu_sample() {
+  // Get the total number of cores available
+  num_of_cores = sysconf(_SC_NPROCESSORS_ONLN);
+
+  // Prepare the mask for setting the process to all the cores
+  CPU_ZERO(&all_core_mask);
+  int i;
+  for (i = 0; i < num_of_cores; i++) {
+    CPU_SET(i, &all_core_mask);
+  }
+}
+
+void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs) {
+  int i;
+  cpu_set_t mask;
+
+  for (i = 0; i < num_of_cores; i++) {
+    // Re-schedule the process to core i
+    CPU_ZERO(&mask);
+    CPU_SET(i, &mask);
+    sched_setaffinity(0, sizeof(cpu_set_t), &mask);
+    // Record the time
+    gettimeofday(&tvs[i], NULL);
+    // Get the cycle count
+    cycles[i] = rdtsc();
+  }
+
+  // Reset the affinity back to free
+  sched_setaffinity(0, sizeof(cpu_set_t), &all_core_mask);
+}
+
+void estimate_frequency() {
+  int i;
+
+  for (i = 0; i < num_of_cores; i++) {
+    unsigned int microseconds =
+        (tvs[1][i].tv_sec - tvs[0][i].tv_sec) * MICROSECONDS +
+        (tvs[1][i].tv_usec - tvs[0][i].tv_usec);
+    unsigned int frequency =
+        (cycles[1][i] - cycles[0][i]) / microseconds;
+    logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
+  }
+}
 
 void read_groups(perf_event_desc_t* fds, int num) {
   uint64_t* values = NULL;
@@ -168,7 +264,12 @@ void get_pmu_sample(process_list_t* process_info_list,
     logging(LOG_CODE_FATAL, "prctl(enable) failed");
   }
 
+  get_cpu_cycles(cycles[0], tvs[0]);
+
   usleep(sample_interval);
+
+  get_cpu_cycles(cycles[1], tvs[1]);
+  estimate_frequency();
 
   print_pmu_sample(fds, num_fds, process_info_list->size, proc_info);
 

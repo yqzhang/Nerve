@@ -194,6 +194,7 @@ int main(int argc, char** argv) {
 
   // FIXME: Initialize the application sampling
   // init_app_sample(options.hostnames, options.ports, options.num_applications);
+  init_pmu_sample();
 
   while (true) {
     // Sample all the running processes, and calculate their utilization

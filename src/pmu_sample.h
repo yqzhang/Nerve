@@ -19,6 +19,12 @@
 
 #define MAX_GROUPS 256
 
+void init_pmu_sample();
+
+void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs);
+
+void estimate_frequency();
+
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_GROUPS],
                     unsigned int sample_interval);
