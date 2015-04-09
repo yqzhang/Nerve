@@ -132,12 +132,16 @@ void estimate_frequency() {
       (tvs[1].tv_sec - tvs[0].tv_sec) * MICROSECONDS +
       (tvs[1].tv_usec - tvs[0].tv_usec);
 
+  // FIXME: There seems to be some issues reading MSR on SandyBridge when
+  // SMT is enabled, maybe we should instead use the numbers we get from the
+  // actual logical cores.
   for (i = 0; i < num_of_cores; i++) {
     unsigned long long delta_cpu_clk_unhalted_core, delta_cpu_clk_unhalted_ref;
     // Handle overflow for CPU_CLK_UNHALTED_CORE
     if (cpu_clk_unhalted_core[1][i] < cpu_clk_unhalted_core[0][i]) {
       delta_cpu_clk_unhalted_core =
-          (UINT64_MAX - cpu_clk_unhalted_core[0][i]) + cpu_clk_unhalted_core[1][i];
+          (UINT64_MAX - cpu_clk_unhalted_core[0][i]) +
+          cpu_clk_unhalted_core[1][i];
     } else {
       delta_cpu_clk_unhalted_core =
           cpu_clk_unhalted_core[1][i] - cpu_clk_unhalted_core[0][i];
@@ -145,14 +149,16 @@ void estimate_frequency() {
     // Handle overflow for CPU_CLK_UNHALTED_REF
     if (cpu_clk_unhalted_ref[1][i] < cpu_clk_unhalted_ref[0][i]) {
       delta_cpu_clk_unhalted_ref =
-          (UINT64_MAX - cpu_clk_unhalted_ref[0][i]) + cpu_clk_unhalted_ref[1][i];
+          (UINT64_MAX - cpu_clk_unhalted_ref[0][i]) +
+          cpu_clk_unhalted_ref[1][i];
     } else {
       delta_cpu_clk_unhalted_ref =
           cpu_clk_unhalted_ref[1][i] - cpu_clk_unhalted_ref[0][i];
     }
     unsigned int frequency =
         ((cycles[1] - cycles[0]) / microseconds) *
-        ((double) delta_cpu_clk_unhalted_core / (double) delta_cpu_clk_unhalted_ref);
+        ((double) delta_cpu_clk_unhalted_core /
+         (double) delta_cpu_clk_unhalted_ref);
     logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
   }
 }
