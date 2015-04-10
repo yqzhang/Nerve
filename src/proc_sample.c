@@ -107,6 +107,45 @@ void get_process_info(process_list_t* process_list,
                                   sysconf(_SC_PAGESIZE));
         process_list->processes[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
+
+        // Get the CPU affinity information of all child processes/threads
+        process_list->processes[process_list->size].cpu_affinity = 0ULL;
+        char child_dir_location[64];
+        // The chile processes/threads are located in /proc/*/task/
+        sprintf(child_dir_location, "/proc/%s/task/", curr_dir_ptr->d_name);
+        DIR* child_dir_ptr = opendir(child_dir_location);
+        struct dirent* curr_child_dir_ptr;
+        while ((curr_child_dir_ptr = readdir(child_dir_ptr)) != NULL) {
+          if (curr_child_dir_ptr->d_name[0] >= '0' &&
+              curr_child_dir_ptr->d_name[0] <= '9') {
+            char child_stat_location[64];
+            sprintf(child_stat_location, "/proc/%s/task/%s/stat",
+                    curr_dir_ptr->d_name, curr_child_dir_ptr->d_name);
+            FILE* child_fp = fopen(child_stat_location, "r");
+            if (child_fp == NULL) {
+              // This means the it has gone shortly after we list the directory
+              continue;
+            }
+            // Read /proc/*/task/*/stat for the CPU affinity information
+            // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+            // ...
+            // (24) processor  %d : CPU number last executed on
+            // ...
+            int processor;
+            fscanf(child_fp,
+                   "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u " // 1 - 12
+                   "%*u %*u %*u %*d %*d %*d %*d %*d %*d %*u %*u %*d " // 13 - 24
+                   "%*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u " // 25 - 36
+                   "%*u %*d %d", // 37 - 39
+                   &processor);
+            fclose(child_fp);
+            // Keep a mask for CPU affinity
+            process_list->processes[process_list->size].cpu_affinity |=
+                (1ULL << processor);
+          }
+        }
+        // Close the directory
+        (void)closedir(child_dir_ptr);
 	
         // Try to find the PID in the previous list
         while (i < prev_process_list->size &&

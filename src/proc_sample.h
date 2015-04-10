@@ -22,6 +22,7 @@ typedef struct process {
   unsigned long cutime;
   unsigned long cstime;
   unsigned long ttime;
+  unsigned long long cpu_affinity;
   float cpu_utilization;
   float virtual_mem_utilization;
   float real_mem_utilization;
