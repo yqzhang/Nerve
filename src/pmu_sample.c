@@ -166,6 +166,17 @@ void estimate_frequency() {
 void init_pmu_sample() {
   // Get the total number of cores available
   num_of_cores = sysconf(_SC_NPROCESSORS_ONLN);
+
+  // Initialize libpfm
+  int ret = pfm_initialize();
+  if (ret != PFM_SUCCESS) {
+    logging(LOG_CODE_FATAL, "Cannot initialize library: %s", pfm_strerror(ret));
+  }
+}
+
+void clean_pmu_sample() {
+  /* free libpfm resources cleanly */
+  pfm_terminate();
 }
 
 void read_groups(perf_event_desc_t* fds, int num) {
@@ -283,11 +294,6 @@ void get_pmu_sample(process_list_t* process_info_list,
   /*
    * Initialize pfm library (required before we can use it)
    */
-  ret = pfm_initialize();
-  if (ret != PFM_SUCCESS) {
-    logging(LOG_CODE_FATAL, "Cannot initialize library: %s", pfm_strerror(ret));
-  }
-
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
     proc_info[proc_index][0] =
         process_info_list->processes[proc_index].process_id;
@@ -343,7 +349,4 @@ void get_pmu_sample(process_list_t* process_info_list,
 
     perf_free_fds(fds[proc_index], num_fds);
   }
-
-  /* free libpfm resources cleanly */
-  pfm_terminate();
 }

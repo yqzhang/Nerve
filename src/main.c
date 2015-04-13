@@ -217,6 +217,7 @@ int main(int argc, char** argv) {
 
   // FIXME: Clean up application sampling
   // clean_app_sample();
+  clean_pmu_sample();
 
   return 0;
 }

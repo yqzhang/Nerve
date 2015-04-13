@@ -25,6 +25,8 @@ void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_GROUPS],
                     unsigned int sample_interval);
 
+void clean_pmu_sample();
+
 void read_groups(perf_event_desc_t* fds, int num);
 
 void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int proc_num,
