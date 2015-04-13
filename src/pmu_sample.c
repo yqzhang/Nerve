@@ -26,13 +26,18 @@
 #define CPU_CLK_UNHALTED_CORE 0x030a
 #define CPU_CLK_UNHALTED_REF 0x030b
 
+// Total number of cores we need to monitor
 int num_of_cores;
 
+// Data structures that we need to monitor CPU frequency related events
+struct timeval tvs[2];
 unsigned long long cycles[2];
 unsigned long long cpu_clk_unhalted_core[2][MAX_NUM_CORES];
 unsigned long long cpu_clk_unhalted_ref[2][MAX_NUM_CORES];
 
-struct timeval tvs[2];
+// Data structures that we need to monitor PMU events
+perf_event_desc_t* pmu_fds[MAX_NUM_PROCESSES];
+uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS];
 
 // This function reads the raw cycle count on a core, which depends on the
 // core that this process is running on. Depending on the underlying
@@ -244,7 +249,7 @@ void read_groups(perf_event_desc_t* fds, int num) {
 }
 
 void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
-                      uint64_t proc_info[][20]) {
+                      uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]) {
   uint64_t val;
   uint64_t values[3];
   double ratio;
@@ -279,7 +284,7 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
              ", ena=%'" PRIu64 ", run=%'" PRIu64 ")\n",
              val, fds[0][fds_index].name, (1.0 - ratio) * 100.0, values[0],
              values[1], values[2]);
-      proc_info[proc_index][fds_index] = val;
+      pmu_info[proc_index][fds_index] = val;
     }
   }
 }
@@ -287,32 +292,29 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_GROUPS],
                     unsigned int sample_interval) {
-  perf_event_desc_t* fds[512];
   int fds_index, proc_index, ret, num_fds;
-  uint64_t proc_info[512][20];  // The data structure for storing the count.
-
   /*
    * Initialize pfm library (required before we can use it)
    */
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
-    proc_info[proc_index][0] =
+    pmu_info[proc_index][0] =
         process_info_list->processes[proc_index].process_id;
-    fds[proc_index] = NULL;
-    ret = perf_setup_argv_events(events, &(fds[proc_index]), &num_fds);
+    pmu_fds[proc_index] = NULL;
+    ret = perf_setup_argv_events(events, &pmu_fds[proc_index], &num_fds);
     if (ret || !num_fds) {
       logging(LOG_CODE_FATAL, "cannot setup events");
     }
 
-    fds[proc_index][0].fd = -1;
+    pmu_fds[proc_index][0].fd = -1;
 
     for (fds_index = 0; fds_index < num_fds; fds_index++) {
       /* request timing information necessary for scaling */
-      fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
-      fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
+      pmu_fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
+      pmu_fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
       /* each event is in an independent group (multiplexing likely) */
-      fds[proc_index][fds_index].fd = perf_event_open(
-          &fds[proc_index][fds_index].hw, proc_info[proc_index][0], -1, -1, 0);
-      if (fds[proc_index][fds_index].fd == -1) {
+      pmu_fds[proc_index][fds_index].fd = perf_event_open(
+          &pmu_fds[proc_index][fds_index].hw, pmu_info[proc_index][0], -1, -1, 0);
+      if (pmu_fds[proc_index][fds_index].fd == -1) {
         logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
       }
     }
@@ -335,7 +337,7 @@ void get_pmu_sample(process_list_t* process_info_list,
                  cpu_clk_unhalted_ref[1]);
   estimate_frequency();
 
-  print_pmu_sample(fds, num_fds, process_info_list->size, proc_info);
+  print_pmu_sample(pmu_fds, num_fds, process_info_list->size, pmu_info);
 
   /*
    * disable all counters attached to this thread
@@ -345,8 +347,8 @@ void get_pmu_sample(process_list_t* process_info_list,
 
   for (proc_index = 0; proc_index < process_info_list->size; ++proc_index) {
     for (fds_index = 0; fds_index < num_fds; fds_index++)
-      close(fds[proc_index][fds_index].fd);
+      close(pmu_fds[proc_index][fds_index].fd);
 
-    perf_free_fds(fds[proc_index], num_fds);
+    perf_free_fds(pmu_fds[proc_index], num_fds);
   }
 }

@@ -34,7 +34,8 @@
 #define PMU_EVENTS_NAME_LENGTH 256
 
 typedef struct {
-  char events[MAX_GROUPS][PMU_EVENTS_NAME_LENGTH];
+  const char* events[MAX_GROUPS];
+  char events_buffer[MAX_GROUPS][PMU_EVENTS_NAME_LENGTH];
   int num_groups;
   char* config_file;
   const char* applications[MAX_NUM_APPLICATIONS];
@@ -125,6 +126,9 @@ void parse_config(char* config, options_t* options) {
   size_t pmu_index;
   json_t* pmu_value;
 
+  memset(options->events, 0, sizeof(options->events));
+  options->events[0] = &options->events_buffer[0];
+
   json_array_foreach (pmu_list, pmu_index, pmu_value) {
     if (!json_is_string(pmu_value)) {
       logging(LOG_CODE_FATAL,
@@ -133,16 +137,18 @@ void parse_config(char* config, options_t* options) {
     // Start the new group
     if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
       options->num_groups++;
+      options->events[options->num_groups - 1] =
+          &options->events_buffer[options->num_groups - 1];
       num_events_in_group = 0;
     }
     const char* pmu_name = json_string_value(pmu_value);
     // First event in the group
     if (num_events_in_group == 0) {
-      strcpy(options->events[options->num_groups - 1], pmu_name);
+      strcpy(options->events_buffer[options->num_groups - 1], pmu_name);
     // Later on events
     } else {
-      strcat(options->events[options->num_groups - 1], pmu_name);
-      strcat(options->events[options->num_groups - 1], ",");
+      strcat(options->events_buffer[options->num_groups - 1], ",");
+      strcat(options->events_buffer[options->num_groups - 1], pmu_name);
     }
     num_events_in_group++;
 
@@ -206,8 +212,7 @@ int main(int argc, char** argv) {
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval
-    get_pmu_sample(filtered_process_info_list, (const char**)options.events,
-                   1e6);
+    get_pmu_sample(filtered_process_info_list, options.events, 1e6);
 
     // FIXME: Get performance statistics from the applications
     // get_app_sample();

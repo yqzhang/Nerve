@@ -18,6 +18,7 @@
 #include <perfmon/pfmlib_perf_event.h>
 
 #define MAX_GROUPS 256
+#define MAX_EVENTS 32
 
 void init_pmu_sample();
 
@@ -30,6 +31,6 @@ void clean_pmu_sample();
 void read_groups(perf_event_desc_t* fds, int num);
 
 void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int proc_num,
-                      uint64_t proc_info[][20]);
+                      uint64_t proc_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
 
 #endif
