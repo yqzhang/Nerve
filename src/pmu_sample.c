@@ -12,6 +12,7 @@
 
 #include "log_util.h"
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -20,6 +21,8 @@
 #include <sys/time.h>
 
 #define MAX_NUM_CORES 40
+
+#define MAX_LENGTH_PER_LINE 256
 
 #define MICROSECONDS 1000000
 
@@ -38,6 +41,10 @@ unsigned long long cpu_clk_unhalted_ref[2][MAX_NUM_CORES];
 // Data structures that we need to monitor PMU events
 perf_event_desc_t* pmu_fds[MAX_NUM_PROCESSES];
 uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS];
+
+// Data structures that we need to monitor interrupt handling
+long long prev_interrupt_per_core[MAX_NUM_CORES];
+long long interrupt_per_core[MAX_NUM_CORES];
 
 // This function reads the raw cycle count on a core, which depends on the
 // core that this process is running on. Depending on the underlying
@@ -77,6 +84,59 @@ __inline__ unsigned long long rdtsc(void) {
   return result;
 }
 #endif
+
+void get_irq_stats(long long interrupt_per_core[MAX_NUM_CORES]) {
+  FILE* fp;
+  char line[MAX_LENGTH_PER_LINE];
+  long long local_interrupt_per_core[MAX_NUM_CORES];
+
+  fp = fopen("/proc/interrupts", "r");
+  if (fp == NULL) {
+    logging(LOG_CODE_FATAL, "Unable to read /proc/interrupts.\n");
+  }
+
+  // Skip the first line
+  fgets(line, MAX_LENGTH_PER_LINE, fp);
+  while (fgets(line, MAX_LENGTH_PER_LINE, fp) != NULL) {
+    // Check if the first column starts with numbers
+    int i = 0;
+    while (isspace(line[i])) i++;
+    if (line[i] < '0' || line[i] > '9') {
+      break;
+    }
+    while (!isspace(line[i])) i++;
+
+    int j;
+    for (j = 0; j < num_of_cores; j++) {
+      int k = 0;
+      char int_buffer[16];
+      while (isspace(line[i])) i++;
+      while (!isspace(line[i])) int_buffer[k++] = line[i++];
+      int_buffer[k] = '\0';
+      local_interrupt_per_core[j] = atoll(int_buffer);
+    }
+
+    // Skip the second last column
+    while (isspace(line[i])) i++;
+    while (!isspace(line[i])) i++;
+    while (isspace(line[i])) i++;
+
+    // Check if the last column starts with "eth"
+    if (line[i] == 'e' && line[i + 1] == 't' && line[i + 2] == 'h') {
+      for (j = 0; j < num_of_cores; j++) {
+        interrupt_per_core[j] += local_interrupt_per_core[j];
+      }
+    }
+  }
+}
+
+void estimate_irq() {
+  int i;
+  for (i = 0; i < num_of_cores; i++) {
+    logging(LOG_CODE_INFO, "Core %d IRQ: %lld\n", i,
+            interrupt_per_core[i] - prev_interrupt_per_core[i]);
+  }
+}
 
 uint64_t read_msr(int cpu, uint32_t reg, unsigned int highbit,
                   unsigned int lowbit) {
@@ -328,11 +388,19 @@ void get_pmu_sample(process_list_t* process_info_list,
     logging(LOG_CODE_FATAL, "prctl(enable) failed");
   }
 
+  // Network interrupt handling
+  get_irq_stats(prev_interrupt_per_core);
+  // CPU frequency
   get_cpu_cycles(&cycles[0], &tvs[0], cpu_clk_unhalted_core[0],
                  cpu_clk_unhalted_ref[0]);
 
+  // Sample interval controller
   usleep(sample_interval);
 
+  // Network interrupt handling
+  get_irq_stats(interrupt_per_core);
+  estimate_irq();
+  // CPU frequency
   get_cpu_cycles(&cycles[1], &tvs[1], cpu_clk_unhalted_core[1],
                  cpu_clk_unhalted_ref[1]);
   estimate_frequency();

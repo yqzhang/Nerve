@@ -127,7 +127,7 @@ void parse_config(char* config, options_t* options) {
   json_t* pmu_value;
 
   memset(options->events, 0, sizeof(options->events));
-  options->events[0] = &options->events_buffer[0];
+  options->events[0] = (const char*)&options->events_buffer[0];
 
   json_array_foreach (pmu_list, pmu_index, pmu_value) {
     if (!json_is_string(pmu_value)) {
@@ -138,7 +138,7 @@ void parse_config(char* config, options_t* options) {
     if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
       options->num_groups++;
       options->events[options->num_groups - 1] =
-          &options->events_buffer[options->num_groups - 1];
+          (const char*)&options->events_buffer[options->num_groups - 1];
       num_events_in_group = 0;
     }
     const char* pmu_name = json_string_value(pmu_value);
