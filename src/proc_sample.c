@@ -26,8 +26,10 @@ void get_process_info(process_list_t* process_list,
 
   // Read /proc/stat for total CPU time spent by far
   // cpu %user %nice %system %idle %iowait %irq %softirq
-  char pid_stat_location[30] = "/proc/stat";
-  char pid_status_location[30];
+  char pid_stat_location[32] = "/proc/stat";
+  char pid_status_location[32];
+  char pid_io_location[32];
+
   FILE *fp;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
@@ -114,8 +116,8 @@ void get_process_info(process_list_t* process_list,
       // ...
       // voluntary_ctxt_switches:        150
       // nonvoluntary_ctxt_switches:     545
-      unsigned long voluntary_ctxt_switches, nonvoluntary_ctxt_switches;
-      char line_buffer[3][256];
+      unsigned long long voluntary_ctxt_switches, nonvoluntary_ctxt_switches;
+      char line_buffer[4][256];
       char* prev_line = line_buffer[0];
       char* curr_line = line_buffer[1];
       char* next_line = line_buffer[2];
@@ -131,10 +133,44 @@ void get_process_info(process_list_t* process_list,
       // We should expect prev_line, curr_line contain the last 2 lines
       int j = 0;
       while (!isspace(prev_line[j])) j++;
-      voluntary_ctxt_switches = atol(&prev_line[j]);
+      voluntary_ctxt_switches = atoll(&prev_line[j]);
       j = 0;
       while (!isspace(curr_line[j])) j++;
-      nonvoluntary_ctxt_switches = atol(&curr_line[j]);
+      nonvoluntary_ctxt_switches = atoll(&curr_line[j]);
+
+      sprintf(pid_io_location, "/proc/%s/io", curr_dir_ptr->d_name);
+      fp = fopen(pid_io_location, "r");
+      if (fp == NULL) {
+        // This means the process has gone shortly after we list the directory
+        continue;
+      }
+
+      // Read /proc/*/io for information about
+      // - I/O
+      // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+      // ...
+      // read_bytes: 0
+      // write_bytes: 323932160
+      // cancelled_write_bytes: 0
+      unsigned long long read_bytes, write_bytes;
+      char* prev_prev_line = line_buffer[3];
+      while (fgets(next_line, 256, fp) != NULL) {
+        // Rotate the pointers
+        char* tmp_ptr = prev_prev_line;
+        prev_prev_line = prev_line;
+        prev_line = curr_line;
+        curr_line = next_line;
+        next_line = tmp_ptr;
+      }
+      fclose(fp);
+
+      // We should expect prev_prev_line, prev_line, curr_line contain the last 3 lines
+      j = 0;
+      while (!isspace(prev_prev_line[j])) j++;
+      read_bytes = atoll(&prev_prev_line[j]);
+      j = 0;
+      while (!isspace(prev_line[j])) j++;
+      write_bytes = atoll(&prev_line[j]);
 
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
@@ -165,6 +201,9 @@ void get_process_info(process_list_t* process_list,
             voluntary_ctxt_switches;
         process_list->processes[process_list->size].nonvoluntary_ctxt_switches =
             nonvoluntary_ctxt_switches;
+        // I/O
+        process_list->processes[process_list->size].read_bytes = read_bytes;
+        process_list->processes[process_list->size].write_bytes = write_bytes;
 
         // Get the CPU affinity information of all child processes/threads
         process_list->processes[process_list->size].cpu_affinity = 0ULL;
@@ -234,6 +273,15 @@ void get_process_info(process_list_t* process_list,
                          .nonvoluntary_ctxt_switches /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
+          // I/O
+          process_list->processes[process_list->size].io_read_rate =
+              (float)process_list->processes[process_list->size].read_bytes /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          process_list->processes[process_list->size].io_write_rate =
+              (float)process_list->processes[process_list->size].write_bytes /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
         // The PID is in the original list
         } else {
           // Page fault rate
@@ -260,6 +308,17 @@ void get_process_info(process_list_t* process_list,
                           .nonvoluntary_ctxt_switches -
                       prev_process_list->processes[i]
                           .nonvoluntary_ctxt_switches) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          // I/O
+          process_list->processes[process_list->size].io_read_rate =
+              (float)(process_list->processes[process_list->size].read_bytes -
+                      prev_process_list->processes[i].read_bytes) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          process_list->processes[process_list->size].io_write_rate =
+              (float)(process_list->processes[process_list->size].write_bytes -
+                      prev_process_list->processes[i].write_bytes) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         }
@@ -303,11 +362,12 @@ void print_process_info(process_list_t* process_list) {
   for (i = 0; i < process_list->size; i++) {
     printf("  PID: %u, minflt: %lu, cminflt: %lu, majflt: %lu, cmajflt: %lu, "
            "tflt: %lu, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
-           "ttime: %lu, voluntary_ctxt_switches: %lu, "
-           "nonvoluntary_ctxt_switches: %lu, page_fault_rate: %f, "
+           "ttime: %lu, voluntary_ctxt_switches: %llu, "
+           "nonvoluntary_ctxt_switches: %llu, read_bytes: %llu, "
+           "write_bytes: %llu, page_fault_rate: %f, "
            "cpu_utilization: %f, v_ctxt_switch_rate: %f, "
-           "nv_ctxt_switch_rate: %f, virtial_mem_utilization: %f, "
-           "real_mem_utilization: %f\n",
+           "nv_ctxt_switch_rate: %f, io_read_rate: %f, io_write_rate: %f, "
+           "virtial_mem_utilization: %f, real_mem_utilization: %f\n",
            process_list->processes[i].process_id,
            process_list->processes[i].minflt,
            process_list->processes[i].cminflt,
@@ -321,10 +381,14 @@ void print_process_info(process_list_t* process_list) {
            process_list->processes[i].ttime,
            process_list->processes[i].voluntary_ctxt_switches,
            process_list->processes[i].nonvoluntary_ctxt_switches,
+           process_list->processes[i].read_bytes,
+           process_list->processes[i].write_bytes,
            process_list->processes[i].page_fault_rate,
            process_list->processes[i].cpu_utilization,
            process_list->processes[i].v_ctxt_switch_rate,
            process_list->processes[i].nv_ctxt_switch_rate,
+           process_list->processes[i].io_read_rate,
+           process_list->processes[i].io_write_rate,
            process_list->processes[i].virtual_mem_utilization,
            process_list->processes[i].real_mem_utilization);
   }

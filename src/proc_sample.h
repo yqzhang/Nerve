@@ -35,8 +35,10 @@ typedef struct process {
   unsigned long cutime;
   unsigned long cstime;
   unsigned long ttime;
-  unsigned long voluntary_ctxt_switches;
-  unsigned long nonvoluntary_ctxt_switches;
+  unsigned long long voluntary_ctxt_switches;
+  unsigned long long nonvoluntary_ctxt_switches;
+  unsigned long long read_bytes;
+  unsigned long long write_bytes;
   // external:
   unsigned int process_id;
   unsigned long long cpu_affinity;
@@ -44,6 +46,8 @@ typedef struct process {
   float cpu_utilization;
   float v_ctxt_switch_rate;
   float nv_ctxt_switch_rate;
+  float io_read_rate;
+  float io_write_rate;
   float virtual_mem_utilization;
   float real_mem_utilization;
 } process_t;
