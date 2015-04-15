@@ -21,6 +21,7 @@ typedef struct process {
   unsigned long cminor_fault;
   unsigned long major_fault;
   unsigned long cmajor_fault;
+  unsigned long context_switches;
   unsigned long long total_fault;
   unsigned long utime;
   unsigned long stime;
@@ -28,9 +29,6 @@ typedef struct process {
   unsigned long cstime;
   unsigned long ttime;
   unsigned long long cpu_affinity;
-  int io_read;
-  int io_write;
-  int context_switches;
   float cpu_utilization;
   float virtual_mem_utilization;
   float real_mem_utilization;

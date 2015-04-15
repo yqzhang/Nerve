@@ -29,8 +29,7 @@ void get_process_info(process_list_t* process_list,
   char pid_stat_location[30] = "/proc/stat";
   char pid_status_location[30];
   FILE *fp;
-  FILE *fp2;   // /proc/[pid]/status
-  FILE *fp3;   // /proc/[pid]/io
+  FILE *fp2;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
     logging(LOG_CODE_FATAL, "Stat File %s does not exist.\n", pid_stat_location);
@@ -77,12 +76,7 @@ void get_process_info(process_list_t* process_list,
       sprintf(pid_status_location, "/proc/%s/status", curr_dir_ptr->d_name);
       fp2 = fopen(pid_status_location, "r");
       if (fp2 == NULL) {
-        continue;
-      }
-      
-      sprintf(pid_status_location, "/proc/%s/io", curr_dir_ptr->d_name);
-      fp3 = fopen(pid_status_location, "r");
-      if (fp3 == NULL) {
+        // This means the process has gone shortly after we list the directory
         continue;
       }
 
@@ -109,7 +103,6 @@ void get_process_info(process_list_t* process_list,
       unsigned long minor_fault,cminor_fault,major_fault,cmajor_fault;
       long cutime_ticks, cstime_ticks, rss_pages;
       char status_value[256], status_value_prev[256], status_value_before_prev[256];
-      char io_value[256], io_value_prev[256], io_value_prev2[256], io_value_prev3[256];
       
       fscanf(fp,
              "%*d %*s %c %*d %*d %*d %*d %*d %*u %lu %lu %lu %lu " // 1-13
@@ -117,23 +110,13 @@ void get_process_info(process_list_t* process_list,
              &process_state, &minor_fault, &cminor_fault, &major_fault, 
              &cmajor_fault,&utime_ticks, &stime_ticks, &cutime_ticks,
              &cstime_ticks, &vsize_bytes, &rss_pages);
-      
       while(fgets(status_value,256, fp2)!= NULL) {
         strcpy(status_value_before_prev,&status_value_prev[25]);
         strcpy(status_value_prev,status_value);
       }
       strcpy(status_value_prev,&status_value_prev[28]);
-      
-      while(fgets(io_value,256, fp3)!= NULL) {
-        strcpy(io_value_prev3,&io_value_prev2[12]);
-        strcpy(io_value_prev2,io_value_prev);
-        strcpy(io_value_prev,io_value);
-      }
-      strcpy(io_value_prev2,&io_value_prev2[13]);
-     
       fclose(fp);
       fclose(fp2);
-      fclose(fp3);
 
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
@@ -143,11 +126,8 @@ void get_process_info(process_list_t* process_list,
         process_list->processes[process_list->size].major_fault = major_fault;
         process_list->processes[process_list->size].cmajor_fault = cmajor_fault;
         process_list->processes[process_list->size].total_fault =
-            minor_fault + cminor_fault + major_fault + cmajor_fault;
-        process_list->processes[process_list->size].io_read =
-            atoi(io_value_prev3);
-        process_list->processes[process_list->size].io_write =
-            atoi(io_value_prev2);
+            minor_fault + cminor_fault + major_fault + cmajor_fault
+            - prev_process_list->processes[process_list->size].total_fault;
         process_list->processes[process_list->size].utime = utime_ticks;
         process_list->processes[process_list->size].stime = stime_ticks;
         process_list->processes[process_list->size].cutime = cutime_ticks;
@@ -155,7 +135,8 @@ void get_process_info(process_list_t* process_list,
         process_list->processes[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
         process_list->processes[process_list->size].context_switches =
-            atoi(status_value_prev) + atoi(status_value_before_prev);
+            atoi(status_value_prev) + atoi(status_value_before_prev)
+            - prev_process_list->processes[process_list->size].context_switches;
         process_list->processes[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
                                   sysconf(_SC_PAGESIZE));
