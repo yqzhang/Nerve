@@ -46,6 +46,16 @@ uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS];
 long long prev_interrupt_per_core[MAX_NUM_CORES];
 long long interrupt_per_core[MAX_NUM_CORES];
 
+// Data structures that we need to monitor network traffic
+unsigned long long network_recv_bytes, prev_network_recv_bytes;
+unsigned long long network_recv_packets, prev_network_recv_packets;
+unsigned long long network_recv_errs, prev_network_recv_errs;
+unsigned long long network_recv_drops, prev_network_recv_drops;
+unsigned long long network_send_bytes, prev_network_send_bytes;
+unsigned long long network_send_packets, prev_network_send_packets;
+unsigned long long network_send_errs, prev_network_send_errs;
+unsigned long long network_send_drops, prev_network_send_drops;
+
 // This function reads the raw cycle count on a core, which depends on the
 // core that this process is running on. Depending on the underlying
 // architecture, the implementation varies:
@@ -128,6 +138,8 @@ void get_irq_stats(long long interrupt_per_core[MAX_NUM_CORES]) {
       }
     }
   }
+
+  fclose(fp);
 }
 
 void estimate_irq() {
@@ -136,6 +148,81 @@ void estimate_irq() {
     logging(LOG_CODE_INFO, "Core %d IRQ: %lld\n", i,
             interrupt_per_core[i] - prev_interrupt_per_core[i]);
   }
+}
+
+void get_network_stats(unsigned long long* network_recv_bytes,
+                       unsigned long long* network_recv_packets,
+                       unsigned long long* network_recv_errs,
+                       unsigned long long* network_recv_drops,
+                       unsigned long long* network_send_bytes,
+                       unsigned long long* network_send_packets,
+                       unsigned long long* network_send_errs,
+                       unsigned long long* network_send_drops) {
+  // Reset all the counts before doing anything
+  *network_recv_bytes = 0ULL;
+  *network_recv_packets = 0ULL;
+  *network_recv_errs = 0ULL;
+  *network_recv_drops = 0ULL;
+  *network_send_bytes = 0ULL;
+  *network_send_packets = 0ULL;
+  *network_send_errs = 0ULL;
+  *network_send_drops = 0ULL;
+
+  FILE* fp;
+  char line[MAX_LENGTH_PER_LINE];
+
+  fp = fopen("/proc/net/dev", "r");
+  if (fp == NULL) {
+    logging(LOG_CODE_FATAL, "Unable to read /proc/net/dev.\n");
+  }
+
+  // Skip the first 2 lines
+  fgets(line, MAX_LENGTH_PER_LINE, fp);
+  fgets(line, MAX_LENGTH_PER_LINE, fp);
+  while (fgets(line,MAX_LENGTH_PER_LINE, fp) != NULL) {
+    /*
+     * We probably do not care about loop back, but all the other ethernet
+     * cards might be interesting. So maybe just sum them up.
+     *
+     * File format:
+     * (1) interface
+     * (2) recv_bytes
+     * (3) recv_packets
+     * (4) recv_errs
+     * (5) recv_drop
+     * ...
+     * (10) send_bytes
+     * (11) send_packets
+     * (12) send_errs
+     * (13) send_drop
+     */
+    char interface[8];
+    unsigned long long recv_bytes, recv_packets, recv_errs, recv_drops;
+    unsigned long long send_bytes, send_packets, send_errs, send_drops;
+    sscanf(line,
+           "%s %llu %llu %llu %llu %*u %*u %*u %*u %llu %llu %llu %llu",
+           interface, &recv_bytes, &recv_packets, &recv_errs, &recv_drops,
+           &send_bytes, &send_packets, &send_errs, &send_drops);
+    if (strncmp(interface, "eth", 3) == 0) {
+      *network_recv_bytes += recv_bytes;
+      *network_recv_packets += recv_packets;
+      *network_recv_errs += recv_errs;
+      *network_recv_drops += recv_drops;
+      *network_send_bytes += send_bytes;
+      *network_send_packets += send_packets;
+      *network_send_errs += send_errs;
+      *network_send_drops += send_drops;
+    }
+  }
+
+  fclose(fp);
+}
+
+void estimate_network() {
+  logging(LOG_CODE_INFO, "recv bytes: %lld\n",
+          network_recv_bytes - prev_network_recv_bytes);
+  logging(LOG_CODE_INFO, "send bytes: %lld\n",
+          network_send_bytes - prev_network_send_bytes);
 }
 
 uint64_t read_msr(int cpu, uint32_t reg, unsigned int highbit,
@@ -393,6 +480,11 @@ void get_pmu_sample(process_list_t* process_info_list,
   // CPU frequency
   get_cpu_cycles(&cycles[0], &tvs[0], cpu_clk_unhalted_core[0],
                  cpu_clk_unhalted_ref[0]);
+  // Network
+  get_network_stats(&prev_network_recv_bytes, &prev_network_recv_packets,
+                    &prev_network_recv_errs, &prev_network_recv_drops,
+                    &prev_network_send_bytes, &prev_network_send_packets,
+                    &prev_network_send_errs, &prev_network_send_drops);
 
   // Sample interval controller
   usleep(sample_interval);
@@ -404,6 +496,12 @@ void get_pmu_sample(process_list_t* process_info_list,
   get_cpu_cycles(&cycles[1], &tvs[1], cpu_clk_unhalted_core[1],
                  cpu_clk_unhalted_ref[1]);
   estimate_frequency();
+  // Network
+  get_network_stats(&network_recv_bytes, &network_recv_packets,
+                    &network_recv_errs, &network_recv_drops,
+                    &network_send_bytes, &network_send_packets,
+                    &network_send_errs, &network_send_drops);
+  estimate_network();
 
   print_pmu_sample(pmu_fds, num_fds, process_info_list->size, pmu_info);
 
