@@ -24,13 +24,18 @@ void get_process_info(process_list_t* process_list,
   struct dirent* curr_dir_ptr;
 
   // Read /proc/stat for total CPU time spent by far
+  // Read /proc/status for context switches
   // cpu %user %nice %system %idle %iowait %irq %softirq
   char pid_stat_location[30] = "/proc/stat";
+  char pid_status_location[30];
   FILE *fp;
+  FILE *fp2;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
     logging(LOG_CODE_FATAL, "Stat File %s does not exist.\n", pid_stat_location);
   }
+
+
   unsigned long temp_cpu_total_time[7];
   fscanf(fp, "%*s %lu %lu %lu %lu %lu %lu %lu",
          &temp_cpu_total_time[0], &temp_cpu_total_time[1],
@@ -68,6 +73,12 @@ void get_process_info(process_list_t* process_list,
         // This means the process has gone shortly after we list the directory
         continue;
       }
+      sprintf(pid_status_location, "/proc/%s/status", curr_dir_ptr->d_name);
+      fp2 = fopen(pid_status_location, "r");
+      if (fp2 == NULL) {
+        // This means the process has gone shortly after we list the directory
+        continue;
+      }
 
       // Read /proc/*/stat for the CPU and memory utilization information of
       // specific PIDs
@@ -75,38 +86,68 @@ void get_process_info(process_list_t* process_list,
       // ...
       // (3)  state  %c  : indicates process state
       // ...
-      // (14) utime  %lu : time spent in user mode
-      // (15) stime  %lu : time spent in kernel mode
-      // (16) cutime %ld : time spent waiting for children in user mode
-      // (17) cstime %ld : time spent waiting for children in kernel mode
+      // (10) minorfault %lu   : minor page faults
+      // (11) cminorfault %lu  : child minor page fault
+      // (12) majorfault %ld   : major page faults 
+      // (13) cmajorfault  %ld : child major page fault
+      // (14) utime  %lu       : time spent in user mode
+      // (15) stime  %lu       : time spent in kernel mode
+      // (16) cutime %ld       : time spent waiting for children in user mode
+      // (17) cstime %ld       : time spent waiting for children in kernel mode
       // ...
-      // (23) vsize  %lu : virtual memory size in bytes
-      // (24) rss    %ld : number of pages that the process has in main memory 
+      // (23) vsize  %lu       : virtual memory size in bytes
+      // (24) rss    %ld       : number of pages that the process has in main memory 
       // ...
       char process_state;
       unsigned long utime_ticks, stime_ticks, vsize_bytes;
+      unsigned long minor_fault,cminor_fault,major_fault,cmajor_fault;
       long cutime_ticks, cstime_ticks, rss_pages;
+      char status_value[256], status_value_prev[256], status_value_before_prev[256];
+      
       fscanf(fp,
-             "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " // 1-13
+             "%*d %*s %c %*d %*d %*d %*d %*d %*u %lu %lu %lu %lu " // 1-13
              "%lu %lu %ld %ld %*d %*d %*d %*d %*u %lu %ld", // 14-24
-             &process_state, &utime_ticks, &stime_ticks, &cutime_ticks,
+             &process_state, &minor_fault, &cminor_fault, &major_fault, 
+             &cmajor_fault,&utime_ticks, &stime_ticks, &cutime_ticks,
              &cstime_ticks, &vsize_bytes, &rss_pages);
+      while(fgets(status_value,256, fp2)!= NULL) {
+        //value_before_prev = atoi(value_prev);
+        strcpy(status_value_before_prev,&status_value_prev[25]);
+        strcpy(status_value_prev,status_value);
+      }
+      strcpy(status_value_prev,&status_value_prev[28]);
+      //context_switches = atoi(status_value_prev) + atoi(status_value_before_prev);
       fclose(fp);
+      fclose(fp2);
 
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
         process_list->processes[process_list->size].process_id = temp_pid;
+        process_list->processes[process_list->size].minor_fault = minor_fault;
+        process_list->processes[process_list->size].cminor_fault = cminor_fault;
+        process_list->processes[process_list->size].major_fault = major_fault;
+        process_list->processes[process_list->size].cmajor_fault = cmajor_fault;
+        process_list->processes[process_list->size].total_fault =
+            minor_fault + cminor_fault + major_fault + cmajor_fault;
         process_list->processes[process_list->size].utime = utime_ticks;
         process_list->processes[process_list->size].stime = stime_ticks;
         process_list->processes[process_list->size].cutime = cutime_ticks;
         process_list->processes[process_list->size].cstime = cstime_ticks;
         process_list->processes[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+        process_list->processes[process_list->size].context_switches =
+            atoi(status_value_prev) + atoi(status_value_before_prev);
         process_list->processes[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
                                   sysconf(_SC_PAGESIZE));
         process_list->processes[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
+        //printf("%d %d %s\n",temp_pid,atoi(value_prev), value_before_prev);
+        //printf("%d -  %d\n",temp_pid, atoi(value_before_prev));
+        //printf("%d -  %d\n",temp_pid, atoi(value_prev));
+        //printf("%d -  %s\n",temp_pid, value_before_prev);
+        //printf("%d -  %s",temp_pid, value_prev);
+        //printf("%d -  %lu\n",temp_pid, process_list->processes[process_list->size].context_switches);
 
         // Get the CPU affinity information of all child processes/threads
         process_list->processes[process_list->size].cpu_affinity = 0ULL;
@@ -205,10 +246,15 @@ void print_process_info(process_list_t* process_list) {
   printf("Size: %zd, CPU total time: %lu\n",
          process_list->size, process_list->cpu_total_time);
   for (i = 0; i < process_list->size; i++) {
-    printf("  PID: %u, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
+    printf("  PID: %u, minor_fault: %lu, cminor_fault: %lu, major_fault: %lu," 
+           "cmajor_fault: %lu, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu,"
            "ttime: %lu, cpu_utilization: %f, virtial_mem_utilization: %f, "
            "real_mem_utilization: %f\n",
            process_list->processes[i].process_id,
+           process_list->processes[i].minor_fault,
+           process_list->processes[i].cminor_fault,
+           process_list->processes[i].major_fault,
+           process_list->processes[i].cmajor_fault,
            process_list->processes[i].utime,
            process_list->processes[i].stime,
            process_list->processes[i].cutime,
