@@ -111,12 +111,10 @@ void get_process_info(process_list_t* process_list,
              &cmajor_fault,&utime_ticks, &stime_ticks, &cutime_ticks,
              &cstime_ticks, &vsize_bytes, &rss_pages);
       while(fgets(status_value,256, fp2)!= NULL) {
-        //value_before_prev = atoi(value_prev);
         strcpy(status_value_before_prev,&status_value_prev[25]);
         strcpy(status_value_prev,status_value);
       }
       strcpy(status_value_prev,&status_value_prev[28]);
-      //context_switches = atoi(status_value_prev) + atoi(status_value_before_prev);
       fclose(fp);
       fclose(fp2);
 
@@ -142,12 +140,6 @@ void get_process_info(process_list_t* process_list,
                                   sysconf(_SC_PAGESIZE));
         process_list->processes[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
-        //printf("%d %d %s\n",temp_pid,atoi(value_prev), value_before_prev);
-        //printf("%d -  %d\n",temp_pid, atoi(value_before_prev));
-        //printf("%d -  %d\n",temp_pid, atoi(value_prev));
-        //printf("%d -  %s\n",temp_pid, value_before_prev);
-        //printf("%d -  %s",temp_pid, value_prev);
-        //printf("%d -  %lu\n",temp_pid, process_list->processes[process_list->size].context_switches);
 
         // Get the CPU affinity information of all child processes/threads
         process_list->processes[process_list->size].cpu_affinity = 0ULL;
