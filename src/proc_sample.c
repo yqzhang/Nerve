@@ -225,11 +225,13 @@ void get_process_info(process_list_t* process_list,
                prev_process_list->cpu_total_time);
           // Context switch rate
           process_list->processes[process_list->size].v_ctxt_switch_rate =
-              (float)process_list->processes[process_list->size].voluntary_ctxt_switches /
+              (float)process_list->processes[process_list->size]
+                         .voluntary_ctxt_switches /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           process_list->processes[process_list->size].nv_ctxt_switch_rate =
-              (float)process_list->processes[process_list->size].nonvoluntary_ctxt_switches /
+              (float)process_list->processes[process_list->size]
+                         .nonvoluntary_ctxt_switches /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         // The PID is in the original list
@@ -248,13 +250,16 @@ void get_process_info(process_list_t* process_list,
                prev_process_list->cpu_total_time);
           // Context switch rate
           process_list->processes[process_list->size].v_ctxt_switch_rate =
-              (float)(process_list->processes[process_list->size].voluntary_ctxt_switches -
+              (float)(process_list->processes[process_list->size]
+                          .voluntary_ctxt_switches -
                       prev_process_list->processes[i].voluntary_ctxt_switches) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           process_list->processes[process_list->size].nv_ctxt_switch_rate =
-              (float)(process_list->processes[process_list->size].nonvoluntary_ctxt_switches -
-                      prev_process_list->processes[i].nonvoluntary_ctxt_switches) /
+              (float)(process_list->processes[process_list->size]
+                          .nonvoluntary_ctxt_switches -
+                      prev_process_list->processes[i]
+                          .nonvoluntary_ctxt_switches) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         }
