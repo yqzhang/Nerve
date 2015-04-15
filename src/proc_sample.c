@@ -126,7 +126,8 @@ void get_process_info(process_list_t* process_list,
         process_list->processes[process_list->size].major_fault = major_fault;
         process_list->processes[process_list->size].cmajor_fault = cmajor_fault;
         process_list->processes[process_list->size].total_fault =
-            minor_fault + cminor_fault + major_fault + cmajor_fault;
+            minor_fault + cminor_fault + major_fault + cmajor_fault
+            - prev_process_list->processes[process_list->size].total_fault;
         process_list->processes[process_list->size].utime = utime_ticks;
         process_list->processes[process_list->size].stime = stime_ticks;
         process_list->processes[process_list->size].cutime = cutime_ticks;
@@ -134,7 +135,8 @@ void get_process_info(process_list_t* process_list,
         process_list->processes[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
         process_list->processes[process_list->size].context_switches =
-            atoi(status_value_prev) + atoi(status_value_before_prev);
+            atoi(status_value_prev) + atoi(status_value_before_prev)
+            - prev_process_list->processes[process_list->size].context_switches;
         process_list->processes[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
                                   sysconf(_SC_PAGESIZE));
