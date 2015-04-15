@@ -15,14 +15,30 @@
 
 #define MAX_NUM_PROCESSES 512
 
+/*
+ * There are 2 types of fields stored here:
+ * - intermediate: The intermediate values we use for calculation
+ * - external: The derived values that can be used externally
+ *
+ * The intermediate values are kept here only to calculate the external values,
+ * which are what we really care about.
+ */
 typedef struct process {
-  unsigned int process_id;
+  // intermediate:
+  unsigned long minflt;
+  unsigned long cminflt;
+  unsigned long majflt;
+  unsigned long cmajflt;
+  unsigned long tflt;
   unsigned long utime;
   unsigned long stime;
   unsigned long cutime;
   unsigned long cstime;
   unsigned long ttime;
+  // external:
+  unsigned int process_id;
   unsigned long long cpu_affinity;
+  float page_fault_rate;
   float cpu_utilization;
   float virtual_mem_utilization;
   float real_mem_utilization;

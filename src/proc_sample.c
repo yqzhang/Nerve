@@ -73,35 +73,51 @@ void get_process_info(process_list_t* process_list,
       // specific PIDs
       // file format: http://man7.org/linux/man-pages/man5/proc.5.html
       // ...
-      // (3)  state  %c  : indicates process state
+      // (3)  state   %c  : indicates process state
       // ...
-      // (14) utime  %lu : time spent in user mode
-      // (15) stime  %lu : time spent in kernel mode
-      // (16) cutime %ld : time spent waiting for children in user mode
-      // (17) cstime %ld : time spent waiting for children in kernel mode
+      // (10) minflt  %lu : minor page faults
+      // (11) cminflt %lu : minor page faults by children
+      // (12) majflt  %lu : major page faults
+      // (13) cmajflt %lu : major page faults by children
+      // (14) utime   %lu : time spent in user mode
+      // (15) stime   %lu : time spent in kernel mode
+      // (16) cutime  %ld : time spent waiting for children in user mode
+      // (17) cstime  %ld : time spent waiting for children in kernel mode
       // ...
-      // (23) vsize  %lu : virtual memory size in bytes
-      // (24) rss    %ld : number of pages that the process has in main memory 
+      // (23) vsize   %lu : virtual memory size in bytes
+      // (24) rss     %ld : number of pages that the process has in main memory
       // ...
       char process_state;
+      unsigned long minflt, cminflt, majflt, cmajflt;
       unsigned long utime_ticks, stime_ticks, vsize_bytes;
       long cutime_ticks, cstime_ticks, rss_pages;
       fscanf(fp,
-             "%*d %*s %c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u " // 1-13
+             "%*d %*s %c %*d %*d %*d %*d %*d %*u %lu %lu %lu %lu " // 1-13
              "%lu %lu %ld %ld %*d %*d %*d %*d %*u %lu %ld", // 14-24
-             &process_state, &utime_ticks, &stime_ticks, &cutime_ticks,
-             &cstime_ticks, &vsize_bytes, &rss_pages);
+             &process_state, &minflt, &cminflt, &majflt, &cmajflt,
+             &utime_ticks, &stime_ticks, &cutime_ticks, &cstime_ticks,
+             &vsize_bytes, &rss_pages);
       fclose(fp);
 
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
+        // PID
         process_list->processes[process_list->size].process_id = temp_pid;
+        // Page faults
+        process_list->processes[process_list->size].minflt = minflt;
+        process_list->processes[process_list->size].cminflt = cminflt;
+        process_list->processes[process_list->size].majflt = majflt;
+        process_list->processes[process_list->size].cmajflt = cmajflt;
+        process_list->processes[process_list->size].tflt =
+            minflt + cminflt + majflt + cmajflt;
+        // CPU utilization
         process_list->processes[process_list->size].utime = utime_ticks;
         process_list->processes[process_list->size].stime = stime_ticks;
         process_list->processes[process_list->size].cutime = cutime_ticks;
         process_list->processes[process_list->size].cstime = cstime_ticks;
         process_list->processes[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
+        // Memory usage
         process_list->processes[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
                                   sysconf(_SC_PAGESIZE));
@@ -155,12 +171,21 @@ void get_process_info(process_list_t* process_list,
         // The PID is not in the original list
         if (i == prev_process_list->size ||
             prev_process_list->processes[i].process_id != temp_pid) {
+          process_list->processes[process_list->size].page_fault_rate =
+              (float)process_list->processes[process_list->size].tflt /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
           process_list->processes[process_list->size].cpu_utilization =
               (float)process_list->processes[process_list->size].ttime /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         // The PID is in the original list
         } else {
+          process_list->processes[process_list->size].page_fault_rate =
+              (float)(process_list->processes[process_list->size].tflt -
+                      prev_process_list->processes[i].tflt) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
           process_list->processes[process_list->size].cpu_utilization =
               (float)(process_list->processes[process_list->size].ttime -
                       prev_process_list->processes[i].ttime) /
@@ -205,15 +230,22 @@ void print_process_info(process_list_t* process_list) {
   printf("Size: %zd, CPU total time: %lu\n",
          process_list->size, process_list->cpu_total_time);
   for (i = 0; i < process_list->size; i++) {
-    printf("  PID: %u, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
-           "ttime: %lu, cpu_utilization: %f, virtial_mem_utilization: %f, "
-           "real_mem_utilization: %f\n",
+    printf("  PID: %u, minflt: %lu, cminflt: %lu, majflt: %lu, cmajflt: %lu, "
+           "tflt: %lu, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
+           "ttime: %lu, page_fault_rate: %f, cpu_utilization: %f, "
+           "virtial_mem_utilization: %f, real_mem_utilization: %f\n",
            process_list->processes[i].process_id,
+           process_list->processes[i].minflt,
+           process_list->processes[i].cminflt,
+           process_list->processes[i].majflt,
+           process_list->processes[i].cmajflt,
+           process_list->processes[i].tflt,
            process_list->processes[i].utime,
            process_list->processes[i].stime,
            process_list->processes[i].cutime,
            process_list->processes[i].cstime,
            process_list->processes[i].ttime,
+           process_list->processes[i].page_fault_rate,
            process_list->processes[i].cpu_utilization,
            process_list->processes[i].virtual_mem_utilization,
            process_list->processes[i].real_mem_utilization);
