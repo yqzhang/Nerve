@@ -17,12 +17,6 @@
 
 typedef struct process {
   unsigned int process_id;
-  unsigned long minor_fault;
-  unsigned long cminor_fault;
-  unsigned long major_fault;
-  unsigned long cmajor_fault;
-  unsigned long context_switches;
-  unsigned long long total_fault;
   unsigned long utime;
   unsigned long stime;
   unsigned long cutime;
