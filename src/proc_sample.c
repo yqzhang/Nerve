@@ -12,6 +12,7 @@
 
 #include "log_util.h"
 
+#include <ctype.h>
 #include <dirent.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@ void get_process_info(process_list_t* process_list,
   // Read /proc/stat for total CPU time spent by far
   // cpu %user %nice %system %idle %iowait %irq %softirq
   char pid_stat_location[30] = "/proc/stat";
+  char pid_status_location[30];
   FILE *fp;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
@@ -69,8 +71,8 @@ void get_process_info(process_list_t* process_list,
         continue;
       }
 
-      // Read /proc/*/stat for the CPU and memory utilization information of
-      // specific PIDs
+      // Read /proc/*/stat for information about:
+      // - CPU, memory, page faults
       // file format: http://man7.org/linux/man-pages/man5/proc.5.html
       // ...
       // (3)  state   %c  : indicates process state
@@ -99,6 +101,41 @@ void get_process_info(process_list_t* process_list,
              &vsize_bytes, &rss_pages);
       fclose(fp);
 
+      sprintf(pid_status_location, "/proc/%s/status", curr_dir_ptr->d_name);
+      fp = fopen(pid_status_location, "r");
+      if (fp == NULL) {
+        // This means the process has gone shortly after we list the directory
+        continue;
+      }
+
+      // Read /proc/*/status for information about:
+      // - context switches
+      // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+      // ...
+      // voluntary_ctxt_switches:        150
+      // nonvoluntary_ctxt_switches:     545
+      unsigned long voluntary_ctxt_switches, nonvoluntary_ctxt_switches;
+      char line_buffer[3][256];
+      char* prev_line = line_buffer[0];
+      char* curr_line = line_buffer[1];
+      char* next_line = line_buffer[2];
+      while (fgets(next_line, 256, fp) != NULL) {
+        // Rotate the pointers
+        char* tmp_ptr = prev_line;
+        prev_line = curr_line;
+        curr_line = next_line;
+        next_line = tmp_ptr;
+      }
+      fclose(fp);
+
+      // We should expect prev_line, curr_line contain the last 2 lines
+      int j = 0;
+      while (!isspace(prev_line[j])) j++;
+      voluntary_ctxt_switches = atol(&prev_line[j]);
+      j = 0;
+      while (!isspace(curr_line[j])) j++;
+      nonvoluntary_ctxt_switches = atol(&curr_line[j]);
+
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
         // PID
@@ -123,6 +160,11 @@ void get_process_info(process_list_t* process_list,
                                   sysconf(_SC_PAGESIZE));
         process_list->processes[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
+        // Context switches
+        process_list->processes[process_list->size].voluntary_ctxt_switches =
+            voluntary_ctxt_switches;
+        process_list->processes[process_list->size].nonvoluntary_ctxt_switches =
+            nonvoluntary_ctxt_switches;
 
         // Get the CPU affinity information of all child processes/threads
         process_list->processes[process_list->size].cpu_affinity = 0ULL;
@@ -171,24 +213,48 @@ void get_process_info(process_list_t* process_list,
         // The PID is not in the original list
         if (i == prev_process_list->size ||
             prev_process_list->processes[i].process_id != temp_pid) {
+          // Page fault rate
           process_list->processes[process_list->size].page_fault_rate =
               (float)process_list->processes[process_list->size].tflt /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
+          // CPU utilization
           process_list->processes[process_list->size].cpu_utilization =
               (float)process_list->processes[process_list->size].ttime /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
+          // Context switch rate
+          process_list->processes[process_list->size].v_ctxt_switch_rate =
+              (float)process_list->processes[process_list->size].voluntary_ctxt_switches /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          process_list->processes[process_list->size].nv_ctxt_switch_rate =
+              (float)process_list->processes[process_list->size].nonvoluntary_ctxt_switches /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
         // The PID is in the original list
         } else {
+          // Page fault rate
           process_list->processes[process_list->size].page_fault_rate =
               (float)(process_list->processes[process_list->size].tflt -
                       prev_process_list->processes[i].tflt) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
+          // CPU utilization
           process_list->processes[process_list->size].cpu_utilization =
               (float)(process_list->processes[process_list->size].ttime -
                       prev_process_list->processes[i].ttime) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          // Context switch rate
+          process_list->processes[process_list->size].v_ctxt_switch_rate =
+              (float)(process_list->processes[process_list->size].voluntary_ctxt_switches -
+                      prev_process_list->processes[i].voluntary_ctxt_switches) /
+              (process_list->cpu_total_time -
+               prev_process_list->cpu_total_time);
+          process_list->processes[process_list->size].nv_ctxt_switch_rate =
+              (float)(process_list->processes[process_list->size].nonvoluntary_ctxt_switches -
+                      prev_process_list->processes[i].nonvoluntary_ctxt_switches) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         }
@@ -232,8 +298,11 @@ void print_process_info(process_list_t* process_list) {
   for (i = 0; i < process_list->size; i++) {
     printf("  PID: %u, minflt: %lu, cminflt: %lu, majflt: %lu, cmajflt: %lu, "
            "tflt: %lu, utime: %lu, stime: %lu, cutime: %lu, cstime: %lu, "
-           "ttime: %lu, page_fault_rate: %f, cpu_utilization: %f, "
-           "virtial_mem_utilization: %f, real_mem_utilization: %f\n",
+           "ttime: %lu, voluntary_ctxt_switches: %lu, "
+           "nonvoluntary_ctxt_switches: %lu, page_fault_rate: %f, "
+           "cpu_utilization: %f, v_ctxt_switch_rate: %f, "
+           "nv_ctxt_switch_rate: %f, virtial_mem_utilization: %f, "
+           "real_mem_utilization: %f\n",
            process_list->processes[i].process_id,
            process_list->processes[i].minflt,
            process_list->processes[i].cminflt,
@@ -245,8 +314,12 @@ void print_process_info(process_list_t* process_list) {
            process_list->processes[i].cutime,
            process_list->processes[i].cstime,
            process_list->processes[i].ttime,
+           process_list->processes[i].voluntary_ctxt_switches,
+           process_list->processes[i].nonvoluntary_ctxt_switches,
            process_list->processes[i].page_fault_rate,
            process_list->processes[i].cpu_utilization,
+           process_list->processes[i].v_ctxt_switch_rate,
+           process_list->processes[i].nv_ctxt_switch_rate,
            process_list->processes[i].virtual_mem_utilization,
            process_list->processes[i].real_mem_utilization);
   }
