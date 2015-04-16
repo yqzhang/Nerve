@@ -33,6 +33,12 @@
 // Max length of each event list
 #define PMU_EVENTS_NAME_LENGTH 256
 
+// PMU for NUMA local accesses
+#define PMU_NUMA_LMA "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
+
+// PMU for NUMA remote accesses
+#define PMU_NUMA_RMA "OFFCORE_RESPONSE_0:DMND_DATA_RD:LLC_MISS_REMOTE:SNP_MISS:SNP_NO_FWD"
+
 typedef struct {
   const char* events[MAX_GROUPS];
   char events_buffer[MAX_GROUPS][PMU_EVENTS_NAME_LENGTH];
@@ -155,6 +161,36 @@ void parse_config(char* config, options_t* options) {
     logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
             pmu_name, options->num_groups - 1);
   }
+
+  // Add PMU counters for NUMA events (local memory access)
+  if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
+    options->num_groups++;
+    options->events[options->num_groups - 1] =
+        (const char*)&options->events_buffer[options->num_groups - 1];
+    num_events_in_group = 0;
+    strcpy(options->events_buffer[options->num_groups - 1], PMU_NUMA_LMA);
+  } else {
+    strcat(options->events_buffer[options->num_groups - 1], ",");
+    strcat(options->events_buffer[options->num_groups - 1], PMU_NUMA_LMA);
+  }
+  num_events_in_group++;
+  logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
+          PMU_NUMA_LMA, options->num_groups - 1);
+
+  // Add PMU counters for NUMA events (remote memory access)
+  if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
+    options->num_groups++;
+    options->events[options->num_groups - 1] =
+        (const char*)&options->events_buffer[options->num_groups - 1];
+    num_events_in_group = 0;
+    strcpy(options->events_buffer[options->num_groups - 1], PMU_NUMA_RMA);
+  } else {
+    strcat(options->events_buffer[options->num_groups - 1], ",");
+    strcat(options->events_buffer[options->num_groups - 1], PMU_NUMA_RMA);
+  }
+  num_events_in_group++;
+  logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
+          PMU_NUMA_LMA, options->num_groups - 1);
 
   // Clean up
   json_decref(json_root);

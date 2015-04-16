@@ -271,9 +271,12 @@ void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs,
   // Get the cycle count
   *cycles = rdtsc();
 
-  for (i = 0; i < num_of_cores; i++) {
+  for (i = 0; i < num_of_cores / 2; i++) {
     cpu_clk_unhalted_core[i] = read_msr(i, CPU_CLK_UNHALTED_CORE, 63, 0);
     cpu_clk_unhalted_ref[i] = read_msr(i, CPU_CLK_UNHALTED_REF, 63, 0);
+    // For SMT cores
+    cpu_clk_unhalted_core[i + num_of_cores / 2] = cpu_clk_unhalted_core[i];
+    cpu_clk_unhalted_ref[i + num_of_cores / 2] = cpu_clk_unhalted_ref[i];
   }
 }
 
@@ -309,8 +312,8 @@ void estimate_frequency() {
     }
     unsigned int frequency =
         ((cycles[1] - cycles[0]) / microseconds) *
-        ((double) delta_cpu_clk_unhalted_core /
-         (double) delta_cpu_clk_unhalted_ref);
+        ((long double) delta_cpu_clk_unhalted_core /
+         (long double) delta_cpu_clk_unhalted_ref);
     logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
   }
 }
