@@ -20,7 +20,7 @@ OBJS = $(SRCS:.c=.o)
 
 .PHONY: all
 
-all: $(TARGET)
+all: clean $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $? $(LIBS)
