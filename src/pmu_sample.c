@@ -312,8 +312,8 @@ void estimate_frequency() {
     }
     unsigned int frequency =
         ((cycles[1] - cycles[0]) / microseconds) *
-        ((long double) delta_cpu_clk_unhalted_core /
-         (long double) delta_cpu_clk_unhalted_ref);
+        ((double) delta_cpu_clk_unhalted_core /
+         (double) delta_cpu_clk_unhalted_ref);
     logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
   }
 }
