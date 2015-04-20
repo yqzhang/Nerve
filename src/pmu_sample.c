@@ -463,7 +463,8 @@ void get_pmu_sample(process_list_t* process_info_list,
       pmu_fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
       /* each event is in an independent group (multiplexing likely) */
       pmu_fds[proc_index][fds_index].fd = perf_event_open(
-          &pmu_fds[proc_index][fds_index].hw, pmu_info[proc_index][0], -1, -1, 0);
+          &pmu_fds[proc_index][fds_index].hw, pmu_info[proc_index][0], -1, -1,
+          0);
       if (pmu_fds[proc_index][fds_index].fd == -1) {
         logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
       }
