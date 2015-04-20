@@ -15,6 +15,7 @@
 
 void read_file(char* filename, char* read_buffer, unsigned int buffer_size);
 
-void write_file(char* filename, char* write_buffer, unsigned int size, bool append);
+void write_file(char* filename, char* write_buffer, unsigned int size,
+                bool append);
 
 #endif
