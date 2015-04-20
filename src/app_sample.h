@@ -11,8 +11,10 @@
 #ifndef __APP_SAMPLE_H__
 #define __APP_SAMPLE_H__
 
+#include <stdbool.h>
 #include <sys/types.h>
 
+#define MAX_APP_NAME_LENGTH 32
 #define MAX_HOSTNAME_LENGTH 32
 #define MAX_NUM_APPLICATIONS 8
 
@@ -20,6 +22,7 @@ typedef struct application {
   char hostname[MAX_HOSTNAME_LENGTH];
   unsigned int port;
   int sockfd;
+  bool connected;
 } application_t;
 
 typedef struct application_list {
@@ -52,7 +55,8 @@ typedef struct snoop_reply {
   double tail_latency;
 } snoop_reply_t;
 
-int init_app_sample(const char** hostnames, unsigned int* ports,
+int init_app_sample(char hostnames[MAX_NUM_APPLICATIONS][MAX_HOSTNAME_LENGTH],
+                    unsigned int ports[MAX_NUM_APPLICATIONS],
                     unsigned int num_applications);
 
 void get_app_sample();

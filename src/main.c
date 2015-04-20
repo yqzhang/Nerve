@@ -44,18 +44,15 @@ typedef struct {
   char events_buffer[MAX_GROUPS][PMU_EVENTS_NAME_LENGTH];
   int num_groups;
   char* config_file;
-  const char* applications[MAX_NUM_APPLICATIONS];
-  const char* hostnames[MAX_NUM_APPLICATIONS];
+  char applications[MAX_NUM_APPLICATIONS][MAX_APP_NAME_LENGTH];
+  char hostnames[MAX_NUM_APPLICATIONS][MAX_HOSTNAME_LENGTH];
   unsigned int ports[MAX_NUM_APPLICATIONS];
   int num_applications;
 } options_t;
 
-// TODO: maybe use this for in sig_handler
-static volatile int quit;
-
 static void sig_handler(int n) {
-  // TODO: handle interrupts
-  exit(0);
+  clean_app_sample();
+  clean_pmu_sample();
 }
 
 static void usage(void) {
@@ -111,9 +108,9 @@ void parse_config(char* config, options_t* options) {
     }
 
     // Record the parsed information into options
-    options->applications[options->num_applications] = app_key;
-    options->hostnames[options->num_applications] =
-        json_string_value(json_hostname);
+    strcpy(options->applications[options->num_applications], app_key);
+    strcpy(options->hostnames[options->num_applications],
+           json_string_value(json_hostname));
     options->ports[options->num_applications] =
         json_integer_value(json_port);
     logging(LOG_CODE_INFO, "Start monitoring application: %s at %s:%d.\n",
@@ -234,8 +231,9 @@ int main(int argc, char** argv) {
   process_list_t* prev_process_info_list = &process_info_array[1];
   process_list_t* filtered_process_info_list = &process_info_array[2];
 
-  // FIXME: Initialize the application sampling
-  // init_app_sample(options.hostnames, options.ports, options.num_applications);
+  // Initialize the application sampling
+  init_app_sample(options.hostnames, options.ports,
+                  options.num_applications);
   init_pmu_sample();
 
   while (true) {
@@ -250,14 +248,14 @@ int main(int argc, char** argv) {
     // and sleep for the same time as sample interval
     get_pmu_sample(filtered_process_info_list, options.events, 1e6);
 
-    // FIXME: Get performance statistics from the applications
-    // get_app_sample();
+    // Get performance statistics from the applications
+    get_app_sample();
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }
 
-  // FIXME: Clean up application sampling
-  // clean_app_sample();
+  // Clean up application sampling
+  clean_app_sample();
   clean_pmu_sample();
 
   return 0;
