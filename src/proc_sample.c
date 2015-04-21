@@ -176,38 +176,38 @@ void get_process_info(process_list_t* process_list,
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
         // PID
-        process_list->processes[process_list->size].process_id = temp_pid;
+        process_list->processes_e[process_list->size].process_id = temp_pid;
         // Page faults
-        process_list->processes[process_list->size].minflt = minflt;
-        process_list->processes[process_list->size].cminflt = cminflt;
-        process_list->processes[process_list->size].majflt = majflt;
-        process_list->processes[process_list->size].cmajflt = cmajflt;
-        process_list->processes[process_list->size].tflt =
+        process_list->processes_i[process_list->size].minflt = minflt;
+        process_list->processes_i[process_list->size].cminflt = cminflt;
+        process_list->processes_i[process_list->size].majflt = majflt;
+        process_list->processes_i[process_list->size].cmajflt = cmajflt;
+        process_list->processes_i[process_list->size].tflt =
             minflt + cminflt + majflt + cmajflt;
         // CPU utilization
-        process_list->processes[process_list->size].utime = utime_ticks;
-        process_list->processes[process_list->size].stime = stime_ticks;
-        process_list->processes[process_list->size].cutime = cutime_ticks;
-        process_list->processes[process_list->size].cstime = cstime_ticks;
-        process_list->processes[process_list->size].ttime =
+        process_list->processes_i[process_list->size].utime = utime_ticks;
+        process_list->processes_i[process_list->size].stime = stime_ticks;
+        process_list->processes_i[process_list->size].cutime = cutime_ticks;
+        process_list->processes_i[process_list->size].cstime = cstime_ticks;
+        process_list->processes_i[process_list->size].ttime =
             utime_ticks + stime_ticks + cutime_ticks + cstime_ticks;
         // Memory usage
-        process_list->processes[process_list->size].virtual_mem_utilization =
+        process_list->processes_e[process_list->size].virtual_mem_utilization =
             (float)vsize_bytes / (sysconf(_SC_PHYS_PAGES) *
                                   sysconf(_SC_PAGESIZE));
-        process_list->processes[process_list->size].real_mem_utilization =
+        process_list->processes_e[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
         // Context switches
-        process_list->processes[process_list->size].voluntary_ctxt_switches =
+        process_list->processes_i[process_list->size].voluntary_ctxt_switches =
             voluntary_ctxt_switches;
-        process_list->processes[process_list->size].nonvoluntary_ctxt_switches =
+        process_list->processes_i[process_list->size].nonvoluntary_ctxt_switches =
             nonvoluntary_ctxt_switches;
         // I/O
-        process_list->processes[process_list->size].read_bytes = read_bytes;
-        process_list->processes[process_list->size].write_bytes = write_bytes;
+        process_list->processes_i[process_list->size].read_bytes = read_bytes;
+        process_list->processes_i[process_list->size].write_bytes = write_bytes;
 
         // Get the CPU affinity information of all child processes/threads
-        process_list->processes[process_list->size].cpu_affinity = 0ULL;
+        process_list->processes_e[process_list->size].cpu_affinity = 0ULL;
         char child_dir_location[64];
         // The chile processes/threads are located in /proc/*/task/
         sprintf(child_dir_location, "/proc/%s/task/", curr_dir_ptr->d_name);
@@ -238,7 +238,7 @@ void get_process_info(process_list_t* process_list,
                    &processor);
             fclose(child_fp);
             // Keep a mask for CPU affinity
-            process_list->processes[process_list->size].cpu_affinity |=
+            process_list->processes_e[process_list->size].cpu_affinity |=
                 (1ULL << processor);
           }
         }
@@ -247,79 +247,79 @@ void get_process_info(process_list_t* process_list,
 	
         // Try to find the PID in the previous list
         while (i < prev_process_list->size &&
-               prev_process_list->processes[i].process_id < temp_pid) {
+               prev_process_list->processes_e[i].process_id < temp_pid) {
           i++;
         }
         // The PID is not in the original list
         if (i == prev_process_list->size ||
-            prev_process_list->processes[i].process_id != temp_pid) {
+            prev_process_list->processes_e[i].process_id != temp_pid) {
           // Page fault rate
-          process_list->processes[process_list->size].page_fault_rate =
-              (float)process_list->processes[process_list->size].tflt /
+          process_list->processes_e[process_list->size].page_fault_rate =
+              (float)process_list->processes_i[process_list->size].tflt /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // CPU utilization
-          process_list->processes[process_list->size].cpu_utilization =
-              (float)process_list->processes[process_list->size].ttime /
+          process_list->processes_e[process_list->size].cpu_utilization =
+              (float)process_list->processes_i[process_list->size].ttime /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // Context switch rate
-          process_list->processes[process_list->size].v_ctxt_switch_rate =
-              (float)process_list->processes[process_list->size]
+          process_list->processes_e[process_list->size].v_ctxt_switch_rate =
+              (float)process_list->processes_i[process_list->size]
                          .voluntary_ctxt_switches /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          process_list->processes[process_list->size].nv_ctxt_switch_rate =
-              (float)process_list->processes[process_list->size]
+          process_list->processes_e[process_list->size].nv_ctxt_switch_rate =
+              (float)process_list->processes_i[process_list->size]
                          .nonvoluntary_ctxt_switches /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // I/O
-          process_list->processes[process_list->size].io_read_rate =
-              (float)process_list->processes[process_list->size].read_bytes /
+          process_list->processes_e[process_list->size].io_read_rate =
+              (float)process_list->processes_i[process_list->size].read_bytes /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          process_list->processes[process_list->size].io_write_rate =
-              (float)process_list->processes[process_list->size].write_bytes /
+          process_list->processes_e[process_list->size].io_write_rate =
+              (float)process_list->processes_i[process_list->size].write_bytes /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         // The PID is in the original list
         } else {
           // Page fault rate
-          process_list->processes[process_list->size].page_fault_rate =
-              (float)(process_list->processes[process_list->size].tflt -
-                      prev_process_list->processes[i].tflt) /
+          process_list->processes_e[process_list->size].page_fault_rate =
+              (float)(process_list->processes_i[process_list->size].tflt -
+                      prev_process_list->processes_i[i].tflt) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // CPU utilization
-          process_list->processes[process_list->size].cpu_utilization =
-              (float)(process_list->processes[process_list->size].ttime -
-                      prev_process_list->processes[i].ttime) /
+          process_list->processes_e[process_list->size].cpu_utilization =
+              (float)(process_list->processes_i[process_list->size].ttime -
+                      prev_process_list->processes_i[i].ttime) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // Context switch rate
-          process_list->processes[process_list->size].v_ctxt_switch_rate =
-              (float)(process_list->processes[process_list->size]
+          process_list->processes_e[process_list->size].v_ctxt_switch_rate =
+              (float)(process_list->processes_i[process_list->size]
                           .voluntary_ctxt_switches -
-                      prev_process_list->processes[i].voluntary_ctxt_switches) /
+                      prev_process_list->processes_i[i].voluntary_ctxt_switches) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          process_list->processes[process_list->size].nv_ctxt_switch_rate =
-              (float)(process_list->processes[process_list->size]
+          process_list->processes_e[process_list->size].nv_ctxt_switch_rate =
+              (float)(process_list->processes_i[process_list->size]
                           .nonvoluntary_ctxt_switches -
-                      prev_process_list->processes[i]
+                      prev_process_list->processes_i[i]
                           .nonvoluntary_ctxt_switches) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
           // I/O
-          process_list->processes[process_list->size].io_read_rate =
-              (float)(process_list->processes[process_list->size].read_bytes -
-                      prev_process_list->processes[i].read_bytes) /
+          process_list->processes_e[process_list->size].io_read_rate =
+              (float)(process_list->processes_i[process_list->size].read_bytes -
+                      prev_process_list->processes_i[i].read_bytes) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          process_list->processes[process_list->size].io_write_rate =
-              (float)(process_list->processes[process_list->size].write_bytes -
-                      prev_process_list->processes[i].write_bytes) /
+          process_list->processes_e[process_list->size].io_write_rate =
+              (float)(process_list->processes_i[process_list->size].write_bytes -
+                      prev_process_list->processes_i[i].write_bytes) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
         }
@@ -345,13 +345,13 @@ void filter_process_info(process_list_t* process_info_list,
   for (i = 0; i < num_of_processes; i++) {
     int max_index = i;
     float max_value =
-        process_info_list->processes[temp_index_list[i]].cpu_utilization;
+        process_info_list->processes_e[temp_index_list[i]].cpu_utilization;
     for (j = i + 1; j < process_info_list->size; j++) {
-      if (process_info_list->processes[temp_index_list[j]].cpu_utilization >
+      if (process_info_list->processes_e[temp_index_list[j]].cpu_utilization >
           max_value) {
         max_index = j;
         max_value =
-            process_info_list->processes[temp_index_list[j]].cpu_utilization;
+            process_info_list->processes_e[temp_index_list[j]].cpu_utilization;
       }
       // Swap
       int temp = temp_index_list[i];
@@ -365,8 +365,8 @@ void filter_process_info(process_list_t* process_info_list,
       process_info_list->cpu_total_time;
   filtered_process_info_list->size = num_of_processes;
   for (i = 0; i < num_of_processes; i++) {
-    filtered_process_info_list->processes[i] =
-        process_info_list->processes[temp_index_list[i]];
+    filtered_process_info_list->processes_e[i] =
+        process_info_list->processes_e[temp_index_list[i]];
   }
 }
 
@@ -391,28 +391,28 @@ void print_process_info(process_list_t* process_list) {
            "cpu_utilization: %f, v_ctxt_switch_rate: %f, "
            "nv_ctxt_switch_rate: %f, io_read_rate: %f, io_write_rate: %f, "
            "virtial_mem_utilization: %f, real_mem_utilization: %f\n",
-           process_list->processes[i].process_id,
-           process_list->processes[i].minflt,
-           process_list->processes[i].cminflt,
-           process_list->processes[i].majflt,
-           process_list->processes[i].cmajflt,
-           process_list->processes[i].tflt,
-           process_list->processes[i].utime,
-           process_list->processes[i].stime,
-           process_list->processes[i].cutime,
-           process_list->processes[i].cstime,
-           process_list->processes[i].ttime,
-           process_list->processes[i].voluntary_ctxt_switches,
-           process_list->processes[i].nonvoluntary_ctxt_switches,
-           process_list->processes[i].read_bytes,
-           process_list->processes[i].write_bytes,
-           process_list->processes[i].page_fault_rate,
-           process_list->processes[i].cpu_utilization,
-           process_list->processes[i].v_ctxt_switch_rate,
-           process_list->processes[i].nv_ctxt_switch_rate,
-           process_list->processes[i].io_read_rate,
-           process_list->processes[i].io_write_rate,
-           process_list->processes[i].virtual_mem_utilization,
-           process_list->processes[i].real_mem_utilization);
+           process_list->processes_e[i].process_id,
+           process_list->processes_i[i].minflt,
+           process_list->processes_i[i].cminflt,
+           process_list->processes_i[i].majflt,
+           process_list->processes_i[i].cmajflt,
+           process_list->processes_i[i].tflt,
+           process_list->processes_i[i].utime,
+           process_list->processes_i[i].stime,
+           process_list->processes_i[i].cutime,
+           process_list->processes_i[i].cstime,
+           process_list->processes_i[i].ttime,
+           process_list->processes_i[i].voluntary_ctxt_switches,
+           process_list->processes_i[i].nonvoluntary_ctxt_switches,
+           process_list->processes_i[i].read_bytes,
+           process_list->processes_i[i].write_bytes,
+           process_list->processes_e[i].page_fault_rate,
+           process_list->processes_e[i].cpu_utilization,
+           process_list->processes_e[i].v_ctxt_switch_rate,
+           process_list->processes_e[i].nv_ctxt_switch_rate,
+           process_list->processes_e[i].io_read_rate,
+           process_list->processes_e[i].io_write_rate,
+           process_list->processes_e[i].virtual_mem_utilization,
+           process_list->processes_e[i].real_mem_utilization);
   }
 }

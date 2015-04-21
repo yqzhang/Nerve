@@ -64,7 +64,8 @@ static void usage(void) {
       "-c config.json\tconfiguration file in JSON format (required)\n");
 }
 
-void parse_config(char* config, options_t* options) {
+void parse_config(char* config, options_t* options,
+                  hardware_info_t* hardware_info) {
   json_t* json_root;
   json_error_t json_error;
   json_root = json_loads(config, 0, &json_error);
@@ -160,6 +161,8 @@ void parse_config(char* config, options_t* options) {
   num_of_events++;
   logging(LOG_CODE_INFO, "PMU event %s registered.\n", PMU_NUMA_RMA);
 
+  hardware_info->num_of_events = num_of_events;
+
   // Number of processes to monitor that are utilizing the most resources
   json_t* num_of_processes = json_object_get(json_root, "num_of_processes");
   options->num_of_processes = json_integer_value(num_of_processes);
@@ -197,21 +200,24 @@ int main(int argc, char** argv) {
   char json_buffer[JSON_BUFFER_SIZE];
   read_file(options.config_file, json_buffer, JSON_BUFFER_SIZE);
 
-  // Parse the JSON config file
-  parse_config(json_buffer, &options);
-
-  signal(SIGINT, sig_handler);
-
   // Create an array so that we can keep reusing them
   process_list_t process_info_array[3];
   process_list_t* process_info_list = &process_info_array[0];
   process_list_t* prev_process_info_list = &process_info_array[1];
   process_list_t* filtered_process_info_list = &process_info_array[2];
 
+  // Create a struct for the hardware-related information
+  hardware_info_t hardware_info;
+
+  // Parse the JSON config file
+  parse_config(json_buffer, &options, &hardware_info);
+
+  signal(SIGINT, sig_handler);
+
   // Initialize the application sampling
   init_app_sample(options.hostnames, options.ports,
                   options.num_of_applications);
-  init_pmu_sample();
+  init_pmu_sample(&hardware_info);
 
   while (true) {
     // Sample all the running processes, and calculate their utilization
@@ -224,10 +230,19 @@ int main(int argc, char** argv) {
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval
-    get_pmu_sample(filtered_process_info_list, options.events, 1e6);
+    // TODO: Change the sample interval to an argument
+    get_pmu_sample(filtered_process_info_list, options.events, 1e6,
+                   &hardware_info);
 
     // Get performance statistics from the applications
     get_app_sample();
+
+    // Record all the information
+    // TODO: Change the file name to an argument
+    write_all("temp.txt", true, hardware_info.num_of_cores,
+              options.num_of_processes, filtered_process_info_list->processes_e,
+              hardware_info.irq_info, hardware_info.network_info,
+              hardware_info.frequency_info, hardware_info.pmu_info);
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }

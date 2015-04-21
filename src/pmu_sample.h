@@ -19,15 +19,28 @@
 
 #define MAX_EVENTS 32
 
-void init_pmu_sample();
+#define MAX_NUM_CORES 40
+
+typedef struct hardware_info {
+  int num_of_cores;
+  int num_of_events;
+  long long irq_info[MAX_NUM_CORES];
+  unsigned long long network_info[8];
+  unsigned int frequency_info[MAX_NUM_CORES];
+  unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS];
+} hardware_info_t;
+
+void init_pmu_sample(hardware_info_t* hardware_info);
 
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_EVENTS],
-                    unsigned int sample_interval);
+                    unsigned int sample_interval,
+                    hardware_info_t* hardware_info);
 
 void clean_pmu_sample();
 
-void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int proc_num,
-                      uint64_t proc_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
+void record_pmu_sample(
+         perf_event_desc_t** fds, int num_fds, int proc_num,
+         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
 
 #endif

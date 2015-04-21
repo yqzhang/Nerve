@@ -11,11 +11,21 @@
 #ifndef __FILE_UTIL__
 #define __FILE_UTIL__
 
+#include "pmu_sample.h"
+#include "proc_sample.h"
+
 #include <stdbool.h>
 
 void read_file(char* filename, char* read_buffer, unsigned int buffer_size);
 
 void write_file(char* filename, char* write_buffer, unsigned int size,
                 bool append);
+
+void write_all(char* filename, bool append, int num_of_cores,
+               int num_of_processes, process_external_t* proc_info,
+               long long irq_info[MAX_NUM_CORES],
+               unsigned long long network_info[8],
+               unsigned int frequency_info[MAX_NUM_CORES],
+               unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
 
 #endif

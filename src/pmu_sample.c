@@ -20,8 +20,6 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-#define MAX_NUM_CORES 40
-
 #define MAX_LENGTH_PER_LINE 256
 
 #define MICROSECONDS 1000000
@@ -44,7 +42,6 @@ unsigned long long cpu_clk_unhalted_ref[2][MAX_NUM_CORES];
 
 // Data structures that we need to monitor PMU events
 perf_event_desc_t* pmu_fds[MAX_NUM_PROCESSES];
-uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS];
 
 // Data structures that we need to monitor interrupt handling
 long long prev_interrupt_per_core[MAX_NUM_CORES];
@@ -146,11 +143,10 @@ void get_irq_stats(long long interrupt_per_core[MAX_NUM_CORES]) {
   fclose(fp);
 }
 
-void estimate_irq() {
+void estimate_irq(long long irq_info[MAX_NUM_CORES]) {
   int i;
   for (i = 0; i < num_of_cores; i++) {
-    logging(LOG_CODE_INFO, "Core %d IRQ: %lld\n", i,
-            interrupt_per_core[i] - prev_interrupt_per_core[i]);
+    irq_info[i] = interrupt_per_core[i] - prev_interrupt_per_core[i];
   }
 }
 
@@ -222,11 +218,15 @@ void get_network_stats(unsigned long long* network_recv_bytes,
   fclose(fp);
 }
 
-void estimate_network() {
-  logging(LOG_CODE_INFO, "recv bytes: %lld\n",
-          network_recv_bytes - prev_network_recv_bytes);
-  logging(LOG_CODE_INFO, "send bytes: %lld\n",
-          network_send_bytes - prev_network_send_bytes);
+void estimate_network(unsigned long long network_info[8]) {
+  network_info[0] = network_recv_bytes - prev_network_recv_bytes;
+  network_info[1] = network_recv_packets - prev_network_recv_packets;
+  network_info[2] = network_recv_errs - prev_network_recv_errs;
+  network_info[3] = network_recv_drops - prev_network_recv_drops;
+  network_info[4] = network_send_bytes - prev_network_send_bytes;
+  network_info[5] = network_send_packets - prev_network_send_packets;
+  network_info[6] = network_send_errs - prev_network_send_errs;
+  network_info[7] = network_send_drops - prev_network_send_drops;
 }
 
 uint64_t read_msr(int cpu, uint32_t reg, unsigned int highbit,
@@ -284,7 +284,7 @@ void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs,
   }
 }
 
-void estimate_frequency() {
+void estimate_frequency(unsigned int frequency_info[MAX_NUM_CORES]) {
   int i;
 
   unsigned int microseconds =
@@ -318,13 +318,14 @@ void estimate_frequency() {
         ((cycles[1] - cycles[0]) / microseconds) *
         ((double) delta_cpu_clk_unhalted_core /
          (double) delta_cpu_clk_unhalted_ref);
-    logging(LOG_CODE_INFO, "Core %d: frequency %uMHz\n", i, frequency);
+    frequency_info[i] = frequency;
   }
 }
 
-void init_pmu_sample() {
+void init_pmu_sample(hardware_info_t* hardware_info) {
   // Get the total number of cores available
   num_of_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  hardware_info->num_of_cores = num_of_cores;
 
   // Initialize libpfm
   int ret = pfm_initialize();
@@ -342,11 +343,11 @@ void clean_pmu_sample() {
   pfm_terminate();
 }
 
-void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
-                      uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]) {
+void record_pmu_sample(
+         perf_event_desc_t** fds, int num_fds, int num_procs,
+         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]) {
   uint64_t val;
   uint64_t values[3];
-  double ratio;
   int fds_index, proc_index;
   ssize_t ret;
 
@@ -372,12 +373,7 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
        * thus may be multiplexed
        */
       val = perf_scale(values);
-      ratio = perf_scale_ratio(values);
 
-      printf("%'20" PRIu64 " %s (%.2f%% scaling, raw=%'" PRIu64
-             ", ena=%'" PRIu64 ", run=%'" PRIu64 ")\n",
-             val, fds[0][fds_index].name, (1.0 - ratio) * 100.0, values[0],
-             values[1], values[2]);
       pmu_info[proc_index][fds_index] = val;
     }
   }
@@ -386,14 +382,13 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
 // FIXME: This seems to be completely broken for multi-threaded workloads
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_EVENTS],
-                    unsigned int sample_interval) {
+                    unsigned int sample_interval,
+                    hardware_info_t* hardware_info) {
   int fds_index, proc_index, ret, num_fds;
   /*
    * Initialize pfm library (required before we can use it)
    */
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
-    pmu_info[proc_index][0] =
-        process_info_list->processes[proc_index].process_id;
     pmu_fds[proc_index] = NULL;
     ret = perf_setup_argv_events(events, &pmu_fds[proc_index], &num_fds);
     if (ret || !num_fds) {
@@ -409,8 +404,9 @@ void get_pmu_sample(process_list_t* process_info_list,
       pmu_fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
       /* each event is in an independent group (multiplexing likely) */
       pmu_fds[proc_index][fds_index].fd = perf_event_open(
-          &pmu_fds[proc_index][fds_index].hw, pmu_info[proc_index][0], -1, -1,
-          0);
+          &pmu_fds[proc_index][fds_index].hw,
+          process_info_list->processes_e[proc_index].process_id,
+          -1, -1, 0);
       if (pmu_fds[proc_index][fds_index].fd == -1) {
         logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
       }
@@ -450,19 +446,20 @@ void get_pmu_sample(process_list_t* process_info_list,
 
   // Network interrupt handling
   get_irq_stats(interrupt_per_core);
-  estimate_irq();
+  estimate_irq(hardware_info->irq_info);
   // CPU frequency
   get_cpu_cycles(&cycles[1], &tvs[1], cpu_clk_unhalted_core[1],
                  cpu_clk_unhalted_ref[1]);
-  estimate_frequency();
+  estimate_frequency(hardware_info->frequency_info);
   // Network
   get_network_stats(&network_recv_bytes, &network_recv_packets,
                     &network_recv_errs, &network_recv_drops,
                     &network_send_bytes, &network_send_packets,
                     &network_send_errs, &network_send_drops);
-  estimate_network();
+  estimate_network(hardware_info->network_info);
 
-  print_pmu_sample(pmu_fds, num_fds, process_info_list->size, pmu_info);
+  record_pmu_sample(pmu_fds, num_fds, process_info_list->size,
+                    hardware_info->pmu_info);
 
   /*
    * disable all counters attached to this thread
