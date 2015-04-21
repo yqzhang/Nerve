@@ -188,7 +188,7 @@ void parse_config(char* config, options_t* options) {
   }
   num_events_in_group++;
   logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
-          PMU_NUMA_LMA, options->num_groups - 1);
+          PMU_NUMA_RMA, options->num_groups - 1);
 
   // Number of processes to monitor that are utilizing the most resources
   json_t* num_of_processes = json_object_get(json_root, "num_of_processes");
