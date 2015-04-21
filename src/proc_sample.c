@@ -164,7 +164,8 @@ void get_process_info(process_list_t* process_list,
       }
       fclose(fp);
 
-      // We should expect prev_prev_line, prev_line, curr_line contain the last 3 lines
+      // We should expect prev_prev_line, prev_line, curr_line contain the last
+      // 3 lines
       j = 0;
       while (!isspace(prev_prev_line[j])) j++;
       read_bytes = atoll(&prev_prev_line[j]);
@@ -332,18 +333,39 @@ void get_process_info(process_list_t* process_list,
 
 void filter_process_info(process_list_t* process_info_list,
                          process_list_t* filtered_process_info_list,
-                         float filter_by_cpu_utilization) {
+                         int num_of_processes) {
+  // Create a temporary index array to avoid modification on the original array
+  int temp_index_list[MAX_NUM_PROCESSES];
+  int i, j;
+  for (i = 0; i < process_info_list->size; i++) {
+    temp_index_list[i] = i;
+  }
+
+  // Find the k largest elements based on CPU utilization
+  for (i = 0; i < num_of_processes; i++) {
+    int max_index = i;
+    float max_value =
+        process_info_list->processes[temp_index_list[i]].cpu_utilization;
+    for (j = i + 1; j < process_info_list->size; j++) {
+      if (process_info_list->processes[temp_index_list[j]].cpu_utilization > max_value) {
+        max_index = j;
+        max_value =
+            process_info_list->processes[temp_index_list[j]].cpu_utilization;
+      }
+      // Swap
+      int temp = temp_index_list[i];
+      temp_index_list[i] = temp_index_list[max_index];
+      temp_index_list[max_index] = temp;
+    }
+  }
+
+  // Copy the k largest elemented to the filtered list
   filtered_process_info_list->cpu_total_time =
       process_info_list->cpu_total_time;
-  filtered_process_info_list->size = 0;
-  int i;
-  for (i = 0; i < process_info_list->size; i++) {
-    if (process_info_list->processes[i].cpu_utilization >=
-        filter_by_cpu_utilization) {
-      filtered_process_info_list->processes[filtered_process_info_list->size] =
-          process_info_list->processes[i];
-      filtered_process_info_list->size++;
-    }
+  filtered_process_info_list->size = num_of_processes;
+  for (i = 0; i < num_of_processes; i++) {
+    filtered_process_info_list->processes[i] =
+        process_info_list->processes[temp_index_list[i]];
   }
 }
 

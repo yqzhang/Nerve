@@ -12,5 +12,6 @@
   "pmu": [
     "cycles",
     "instructions"
-  ]
+  ],
+  "num_of_processes": 8
 }

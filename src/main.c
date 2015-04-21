@@ -47,7 +47,8 @@ typedef struct {
   char applications[MAX_NUM_APPLICATIONS][MAX_APP_NAME_LENGTH];
   char hostnames[MAX_NUM_APPLICATIONS][MAX_HOSTNAME_LENGTH];
   unsigned int ports[MAX_NUM_APPLICATIONS];
-  int num_applications;
+  int num_of_applications;
+  int num_of_processes;
 } options_t;
 
 static void sig_handler(int n) {
@@ -76,9 +77,9 @@ void parse_config(char* config, options_t* options) {
   json_t* app_dict = json_object_get(json_root, "application");
   const char* app_key;
   json_t* app_value;
-  options->num_applications = 0;
+  options->num_of_applications = 0;
   json_object_foreach (app_dict, app_key, app_value) {
-    if (options->num_applications >= MAX_NUM_APPLICATIONS) {
+    if (options->num_of_applications >= MAX_NUM_APPLICATIONS) {
       logging(LOG_CODE_FATAL, "Too many applications to monitor (max is %d)\n",
               MAX_NUM_APPLICATIONS);
     }
@@ -108,18 +109,18 @@ void parse_config(char* config, options_t* options) {
     }
 
     // Record the parsed information into options
-    strcpy(options->applications[options->num_applications], app_key);
-    strcpy(options->hostnames[options->num_applications],
+    strcpy(options->applications[options->num_of_applications], app_key);
+    strcpy(options->hostnames[options->num_of_applications],
            json_string_value(json_hostname));
-    options->ports[options->num_applications] =
+    options->ports[options->num_of_applications] =
         json_integer_value(json_port);
     logging(LOG_CODE_INFO, "Start monitoring application: %s at %s:%d.\n",
-            options->applications[options->num_applications],
-            options->hostnames[options->num_applications],
-            options->ports[options->num_applications]);
+            options->applications[options->num_of_applications],
+            options->hostnames[options->num_of_applications],
+            options->ports[options->num_of_applications]);
 
     // Increment the application counter
-    options->num_applications++;
+    options->num_of_applications++;
   }
 
   // PMU counters
@@ -189,6 +190,12 @@ void parse_config(char* config, options_t* options) {
   logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
           PMU_NUMA_LMA, options->num_groups - 1);
 
+  // Number of processes to monitor that are utilizing the most resources
+  json_t* num_of_processes = json_object_get(json_root, "num_of_processes");
+  options->num_of_processes = json_integer_value(num_of_processes);
+  logging(LOG_CODE_INFO, "Monitoring the top %d processes.\n",
+          options->num_of_processes);
+
   // Clean up
   json_decref(json_root);
 }
@@ -233,7 +240,7 @@ int main(int argc, char** argv) {
 
   // Initialize the application sampling
   init_app_sample(options.hostnames, options.ports,
-                  options.num_applications);
+                  options.num_of_applications);
   init_pmu_sample();
 
   while (true) {
@@ -242,7 +249,8 @@ int main(int argc, char** argv) {
     get_process_info(process_info_list, prev_process_info_list);
 
     // Filter the list of processes by a list of thresholds
-    filter_process_info(process_info_list, filtered_process_info_list, 0.15);
+    filter_process_info(process_info_list, filtered_process_info_list,
+                        options.num_of_processes);
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval

@@ -63,7 +63,7 @@ void get_process_info(process_list_t* process_info_list,
 
 void filter_process_info(process_list_t* process_info_list,
                          process_list_t* filtered_process_info_list,
-                         float filter_by_cpu_utilization);
+                         int num_of_processes);
 
 void swap_process_list(process_list_t** process_list_a,
                        process_list_t** process_list_b);
