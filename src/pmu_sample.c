@@ -334,70 +334,6 @@ void clean_pmu_sample() {
   pfm_terminate();
 }
 
-void read_groups(perf_event_desc_t* fds, int num) {
-  uint64_t* values = NULL;
-  size_t new_sz, sz = 0;
-  int i, evt;
-  ssize_t ret;
-
-  /*
-   * 	{ u64		nr;
-   * 	  { u64		time_enabled; } && PERF_FORMAT_ENABLED
-   * 	  { u64		time_running; } && PERF_FORMAT_RUNNING
-   * 	  { u64		value;
-   * 	    { u64	id;           } && PERF_FORMAT_ID
-   * 	  }		cntr[nr];
-   * 	} && PERF_FORMAT_GROUP
-   *
-   * we do not use FORMAT_ID in this program
-   */
-
-  for (evt = 0; evt < num;) {
-    int num_evts_to_read;
-
-    num_evts_to_read = 1;
-    new_sz = sizeof(uint64_t) * 3;
-
-    if (new_sz > sz) {
-      sz = new_sz;
-      values = realloc(values, sz);
-    }
-
-    if (!values) {
-      logging(LOG_CODE_FATAL, "cannot allocate memory for values\n");
-    }
-
-    ret = read(fds[evt].fd, values, new_sz);
-    if (ret != (ssize_t)new_sz) {/* unsigned */
-      if (ret == -1) {
-        logging(LOG_CODE_FATAL, "cannot read values event %s", fds[evt].name);
-      }
-
-      /* likely pinned and could not be loaded */
-      logging(LOG_CODE_WARNING,
-              "could not read event %d, tried to read %zu bytes, but got %zd",
-              evt, new_sz, ret);
-    }
-
-    /*
-     * propagate to save area
-     */
-    for (i = evt; i < (evt + num_evts_to_read); i++) {
-      /*
-       * scaling because we may be sharing the PMU and
-       * thus may be multiplexed
-       */
-      fds[i].values[0] = values[0];
-      fds[i].values[1] = values[1];
-      fds[i].values[2] = values[2];
-    }
-    evt += num_evts_to_read;
-  }
-  if (values) {
-    free(values);
-  }
-}
-
 void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
                       uint64_t pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]) {
   uint64_t val;
@@ -439,6 +375,7 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
   }
 }
 
+// FIXME: This seems to be completely broken right now
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_GROUPS],
                     unsigned int sample_interval) {
@@ -450,6 +387,7 @@ void get_pmu_sample(process_list_t* process_info_list,
     pmu_info[proc_index][0] =
         process_info_list->processes[proc_index].process_id;
     pmu_fds[proc_index] = NULL;
+    // FIXME: We need to handle multiple groups
     ret = perf_setup_argv_events(events, &pmu_fds[proc_index], &num_fds);
     if (ret || !num_fds) {
       logging(LOG_CODE_FATAL, "cannot setup events");
