@@ -347,7 +347,8 @@ void filter_process_info(process_list_t* process_info_list,
     float max_value =
         process_info_list->processes[temp_index_list[i]].cpu_utilization;
     for (j = i + 1; j < process_info_list->size; j++) {
-      if (process_info_list->processes[temp_index_list[j]].cpu_utilization > max_value) {
+      if (process_info_list->processes[temp_index_list[j]].cpu_utilization >
+          max_value) {
         max_index = j;
         max_value =
             process_info_list->processes[temp_index_list[j]].cpu_utilization;
