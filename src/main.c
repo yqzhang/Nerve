@@ -53,6 +53,8 @@ typedef struct {
 static void sig_handler(int n) {
   clean_app_sample();
   clean_pmu_sample();
+
+  exit(0);
 }
 
 static void usage(void) {
