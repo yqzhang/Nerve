@@ -17,13 +17,12 @@
 
 #include <perfmon/pfmlib_perf_event.h>
 
-#define MAX_GROUPS 256
 #define MAX_EVENTS 32
 
 void init_pmu_sample();
 
 void get_pmu_sample(process_list_t* process_info_list,
-                    const char* events[MAX_GROUPS],
+                    const char* events[MAX_EVENTS],
                     unsigned int sample_interval);
 
 void clean_pmu_sample();

@@ -375,9 +375,9 @@ void print_pmu_sample(perf_event_desc_t** fds, int num_fds, int num_procs,
   }
 }
 
-// FIXME: This seems to be completely broken right now
+// FIXME: This seems to be completely broken for multi-threaded workloads
 void get_pmu_sample(process_list_t* process_info_list,
-                    const char* events[MAX_GROUPS],
+                    const char* events[MAX_EVENTS],
                     unsigned int sample_interval) {
   int fds_index, proc_index, ret, num_fds;
   /*
@@ -387,7 +387,6 @@ void get_pmu_sample(process_list_t* process_info_list,
     pmu_info[proc_index][0] =
         process_info_list->processes[proc_index].process_id;
     pmu_fds[proc_index] = NULL;
-    // FIXME: We need to handle multiple groups
     ret = perf_setup_argv_events(events, &pmu_fds[proc_index], &num_fds);
     if (ret || !num_fds) {
       logging(LOG_CODE_FATAL, "cannot setup events");
@@ -398,6 +397,7 @@ void get_pmu_sample(process_list_t* process_info_list,
     for (fds_index = 0; fds_index < num_fds; fds_index++) {
       /* request timing information necessary for scaling */
       pmu_fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
+      pmu_fds[proc_index][fds_index].hw.inherit = 1;
       pmu_fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
       /* each event is in an independent group (multiplexing likely) */
       pmu_fds[proc_index][fds_index].fd = perf_event_open(

@@ -31,7 +31,7 @@
 #define PMU_EVENTS_PER_GROUP 5
 
 // Max length of each event list
-#define PMU_EVENTS_NAME_LENGTH 256
+#define PMU_EVENTS_NAME_LENGTH 64
 
 // PMU for NUMA local accesses
 #define PMU_NUMA_LMA "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
@@ -40,9 +40,8 @@
 #define PMU_NUMA_RMA "OFFCORE_RESPONSE_0:DMND_DATA_RD:LLC_MISS_REMOTE:SNP_MISS:SNP_NO_FWD"
 
 typedef struct {
-  const char* events[MAX_GROUPS];
-  char events_buffer[MAX_GROUPS][PMU_EVENTS_NAME_LENGTH];
-  int num_groups;
+  const char* events[MAX_EVENTS];
+  char events_buffer[MAX_EVENTS][PMU_EVENTS_NAME_LENGTH];
   char* config_file;
   char applications[MAX_NUM_APPLICATIONS][MAX_APP_NAME_LENGTH];
   char hostnames[MAX_NUM_APPLICATIONS][MAX_HOSTNAME_LENGTH];
@@ -124,71 +123,40 @@ void parse_config(char* config, options_t* options) {
   }
 
   // PMU counters
-  options->num_groups = 1;
-  int num_events_in_group = 0;
+  int num_of_events = 0;
   json_t* pmu_list = json_object_get(json_root, "pmu");
   size_t pmu_index;
   json_t* pmu_value;
 
   memset(options->events, 0, sizeof(options->events));
-  options->events[0] = (const char*)&options->events_buffer[0];
 
   json_array_foreach (pmu_list, pmu_index, pmu_value) {
     if (!json_is_string(pmu_value)) {
       logging(LOG_CODE_FATAL,
               "The %zuth PMU event is not an integer.\n", pmu_index + 1);
     }
-    // Start the new group
-    if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
-      options->num_groups++;
-      options->events[options->num_groups - 1] =
-          (const char*)&options->events_buffer[options->num_groups - 1];
-      num_events_in_group = 0;
-    }
+    options->events[num_of_events] =
+        (const char*)&options->events_buffer[num_of_events];
     const char* pmu_name = json_string_value(pmu_value);
-    // First event in the group
-    if (num_events_in_group == 0) {
-      strcpy(options->events_buffer[options->num_groups - 1], pmu_name);
-    // Later on events
-    } else {
-      strcat(options->events_buffer[options->num_groups - 1], ",");
-      strcat(options->events_buffer[options->num_groups - 1], pmu_name);
-    }
-    num_events_in_group++;
+    strcpy(options->events_buffer[num_of_events], pmu_name);
+    num_of_events++;
 
-    logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
-            pmu_name, options->num_groups - 1);
+    logging(LOG_CODE_INFO, "PMU event %s registered.\n", pmu_name);
   }
 
   // Add PMU counters for NUMA events (local memory access)
-  if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
-    options->num_groups++;
-    options->events[options->num_groups - 1] =
-        (const char*)&options->events_buffer[options->num_groups - 1];
-    num_events_in_group = 0;
-    strcpy(options->events_buffer[options->num_groups - 1], PMU_NUMA_LMA);
-  } else {
-    strcat(options->events_buffer[options->num_groups - 1], ",");
-    strcat(options->events_buffer[options->num_groups - 1], PMU_NUMA_LMA);
-  }
-  num_events_in_group++;
-  logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
-          PMU_NUMA_LMA, options->num_groups - 1);
+  options->events[num_of_events] =
+      (const char*)&options->events_buffer[num_of_events];
+  strcpy(options->events_buffer[num_of_events], PMU_NUMA_LMA);
+  num_of_events++;
+  logging(LOG_CODE_INFO, "PMU event %s registered.\n", PMU_NUMA_LMA);
 
   // Add PMU counters for NUMA events (remote memory access)
-  if (num_events_in_group == PMU_EVENTS_PER_GROUP) {
-    options->num_groups++;
-    options->events[options->num_groups - 1] =
-        (const char*)&options->events_buffer[options->num_groups - 1];
-    num_events_in_group = 0;
-    strcpy(options->events_buffer[options->num_groups - 1], PMU_NUMA_RMA);
-  } else {
-    strcat(options->events_buffer[options->num_groups - 1], ",");
-    strcat(options->events_buffer[options->num_groups - 1], PMU_NUMA_RMA);
-  }
-  num_events_in_group++;
-  logging(LOG_CODE_INFO, "PMU event %s registered in group %u.\n",
-          PMU_NUMA_RMA, options->num_groups - 1);
+  options->events[num_of_events] =
+      (const char*)&options->events_buffer[num_of_events];
+  strcpy(options->events_buffer[num_of_events], PMU_NUMA_RMA);
+  num_of_events++;
+  logging(LOG_CODE_INFO, "PMU event %s registered.\n", PMU_NUMA_RMA);
 
   // Number of processes to monitor that are utilizing the most resources
   json_t* num_of_processes = json_object_get(json_root, "num_of_processes");
