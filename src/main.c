@@ -240,9 +240,11 @@ int main(int argc, char** argv) {
     // Record all the information
     // TODO: Change the file name to an argument
     write_all("temp.txt", true, hardware_info.num_of_cores,
-              options.num_of_processes, filtered_process_info_list->processes_e,
+              options.num_of_processes, hardware_info.num_of_events,
               hardware_info.irq_info, hardware_info.network_info,
-              hardware_info.frequency_info, hardware_info.pmu_info);
+              hardware_info.frequency_info,
+              filtered_process_info_list->processes_e,
+              hardware_info.pmu_info);
 
     swap_process_list(&process_info_list, &prev_process_info_list);
   }

@@ -22,10 +22,11 @@ void write_file(char* filename, char* write_buffer, unsigned int size,
                 bool append);
 
 void write_all(char* filename, bool append, int num_of_cores,
-               int num_of_processes, process_external_t* proc_info,
+               int num_of_processes, int num_of_events,
                long long irq_info[MAX_NUM_CORES],
                unsigned long long network_info[8],
                unsigned int frequency_info[MAX_NUM_CORES],
+               process_external_t* proc_info,
                unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
 
 #endif
