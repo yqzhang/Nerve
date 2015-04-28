@@ -13,7 +13,11 @@
 
 #include <sys/types.h>
 
+// Max number of processes presented in the OS
 #define MAX_NUM_PROCESSES 512
+
+// Max number of threads for each process
+#define MAX_NUM_THREADS 64
 
 /*
  * There are 2 types of information here:
@@ -40,6 +44,8 @@ typedef struct process_intermediate {
   unsigned long long nonvoluntary_ctxt_switches;
   unsigned long long read_bytes;
   unsigned long long write_bytes;
+  unsigned int child_thread_ids[MAX_NUM_THREADS];
+  unsigned int child_thread_ids_size;
 } process_intermediate_t;
 
 // external:

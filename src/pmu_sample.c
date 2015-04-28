@@ -379,7 +379,6 @@ void record_pmu_sample(
   }
 }
 
-// FIXME: This seems to be completely broken for multi-threaded workloads
 void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_EVENTS],
                     unsigned int sample_interval,

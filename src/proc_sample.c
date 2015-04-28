@@ -209,13 +209,24 @@ void get_process_info(process_list_t* process_list,
         // Get the CPU affinity information of all child processes/threads
         process_list->processes_e[process_list->size].cpu_affinity = 0ULL;
         char child_dir_location[64];
+        // Reset the threads count
+        process_list->processes_i->child_thread_ids_size = 0;
         // The chile processes/threads are located in /proc/*/task/
         sprintf(child_dir_location, "/proc/%s/task/", curr_dir_ptr->d_name);
         DIR* child_dir_ptr = opendir(child_dir_location);
         struct dirent* curr_child_dir_ptr;
+
         while ((curr_child_dir_ptr = readdir(child_dir_ptr)) != NULL) {
           if (curr_child_dir_ptr->d_name[0] >= '0' &&
               curr_child_dir_ptr->d_name[0] <= '9') {
+            // Add the thread ID to the list
+            if (process_list->processes_i[process_list->size].child_thread_ids_size >= MAX_NUM_THREADS) {
+              logging(LOG_CODE_FATAL, "Process %d has too many threads (max is %d).\n", temp_pid, MAX_NUM_THREADS);
+            }
+            process_list->processes_i[process_list->size].child_thread_ids[process_list->processes_i[process_list->size].child_thread_ids_size] =
+                atoi(curr_child_dir_ptr->d_name);
+            process_list->processes_i->child_thread_ids_size++;
+            // Check the affinity information
             char child_stat_location[64];
             sprintf(child_stat_location, "/proc/%s/task/%s/stat",
                     curr_dir_ptr->d_name, curr_child_dir_ptr->d_name);
