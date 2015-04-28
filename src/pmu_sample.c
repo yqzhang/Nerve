@@ -344,23 +344,27 @@ void clean_pmu_sample() {
 }
 
 void record_pmu_sample(
-         perf_event_desc_t** fds, int num_fds, int num_procs,
-         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]) {
+         perf_event_desc_t** fds, int num_fds, int num_pmus,
+         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS],
+         int child_thread_mapping[MAX_NUM_PROCESSES * MAX_NUM_THREADS]) {
   uint64_t val;
   uint64_t values[3];
-  int fds_index, proc_index;
+  int fds_index, pmu_index;
   ssize_t ret;
+
+  // Reset the values
+  memset(pmu_info, 0, MAX_NUM_PROCESSES * MAX_NUM_THREADS * sizeof(int));
 
   /*
    * now read the results. We use pfp_event_count because
    * libpfm guarantees that counters for the events always
    * come first.
    */
-  for (proc_index = 0; proc_index < num_procs; proc_index++) {
+  for (pmu_index = 0; pmu_index < num_pmus; pmu_index++) {
     memset(values, 0, sizeof(values));
 
     for (fds_index = 0; fds_index < num_fds; fds_index++) {
-      ret = read(fds[proc_index][fds_index].fd, values, sizeof(values));
+      ret = read(fds[pmu_index][fds_index].fd, values, sizeof(values));
       if (ret < (ssize_t)sizeof(values)) {
         if (ret == -1) {
           logging(LOG_CODE_FATAL, "cannot read results: %s", "strerror(errno)");
@@ -374,7 +378,7 @@ void record_pmu_sample(
        */
       val = perf_scale(values);
 
-      pmu_info[proc_index][fds_index] = val;
+      pmu_info[child_thread_mapping[pmu_index]][fds_index] += val;
     }
   }
 }
@@ -383,34 +387,53 @@ void get_pmu_sample(process_list_t* process_info_list,
                     const char* events[MAX_EVENTS],
                     unsigned int sample_interval,
                     hardware_info_t* hardware_info) {
-  int fds_index, proc_index, ret, num_fds;
+  int pmu_index, num_pmus;
+  int fds_index, num_fds;
+  int proc_index;
+  int ret;
+  int child_thread_mapping[MAX_NUM_PROCESSES * MAX_NUM_THREADS];
+
   /*
    * Initialize pfm library (required before we can use it)
    */
+  pmu_index = 0;
   for (proc_index = 0; proc_index < process_info_list->size; proc_index++) {
-    pmu_fds[proc_index] = NULL;
-    ret = perf_setup_argv_events(events, &pmu_fds[proc_index], &num_fds);
-    if (ret || !num_fds) {
-      logging(LOG_CODE_FATAL, "cannot setup events");
-    }
-
-    pmu_fds[proc_index][0].fd = -1;
-
-    for (fds_index = 0; fds_index < num_fds; fds_index++) {
-      /* request timing information necessary for scaling */
-      pmu_fds[proc_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
-      pmu_fds[proc_index][fds_index].hw.inherit = 1;
-      pmu_fds[proc_index][fds_index].hw.disabled = 1; /* do not start now */
-      /* each event is in an independent group (multiplexing likely) */
-      pmu_fds[proc_index][fds_index].fd = perf_event_open(
-          &pmu_fds[proc_index][fds_index].hw,
-          process_info_list->processes_e[proc_index].process_id,
-          -1, -1, 0);
-      if (pmu_fds[proc_index][fds_index].fd == -1) {
-        logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
+    // Handle all the threads, including parent and child
+    int i;
+    for (i = 0;
+         i < process_info_list->processes_i[proc_index].child_thread_ids_size;
+         i++) {
+      pmu_fds[pmu_index] = NULL;
+      ret = perf_setup_argv_events(events, &pmu_fds[pmu_index], &num_fds);
+      if (ret || !num_fds) {
+        logging(LOG_CODE_FATAL, "cannot setup events");
       }
+
+      pmu_fds[pmu_index][0].fd = -1;
+
+      for (fds_index = 0; fds_index < num_fds; fds_index++) {
+        /* request timing information necessary for scaling */
+        pmu_fds[pmu_index][fds_index].hw.read_format = PERF_FORMAT_SCALE;
+        pmu_fds[pmu_index][fds_index].hw.inherit = 1;
+        pmu_fds[pmu_index][fds_index].hw.disabled = 1; /* do no start now */
+        /* each event is in an independent group (multiplexing likely) */
+        pmu_fds[pmu_index][fds_index].fd = perf_event_open(
+            &pmu_fds[pmu_index][fds_index].hw,
+            process_info_list->processes_i[proc_index].child_thread_ids[i],
+            -1, -1, 0);
+        if (pmu_fds[pmu_index][fds_index].fd == -1) {
+          logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
+        }
+      }
+      // Record the parent thread
+      child_thread_mapping[pmu_index] = proc_index;
+      // Increment the PMU index for each child thread
+      pmu_index++;
     }
   }
+
+  // Total number of PMUs
+  num_pmus = pmu_index;
 
   /*
    * enable all counters attached to this thread and created by it
@@ -457,8 +480,8 @@ void get_pmu_sample(process_list_t* process_info_list,
                     &network_send_errs, &network_send_drops);
   estimate_network(hardware_info->network_info);
 
-  record_pmu_sample(pmu_fds, num_fds, process_info_list->size,
-                    hardware_info->pmu_info);
+  record_pmu_sample(pmu_fds, num_fds, num_pmus,
+                    hardware_info->pmu_info, child_thread_mapping);
 
   /*
    * disable all counters attached to this thread
@@ -466,10 +489,10 @@ void get_pmu_sample(process_list_t* process_info_list,
   ret = prctl(PR_TASK_PERF_EVENTS_DISABLE);
   if (ret) logging(LOG_CODE_FATAL, "prctl(disable) failed");
 
-  for (proc_index = 0; proc_index < process_info_list->size; ++proc_index) {
-    for (fds_index = 0; fds_index < num_fds; fds_index++)
-      close(pmu_fds[proc_index][fds_index].fd);
-
-    perf_free_fds(pmu_fds[proc_index], num_fds);
+  for (pmu_index = 0; pmu_index < num_pmus; pmu_index++) {
+    for (fds_index = 0; fds_index < num_fds; fds_index++) {
+      close(pmu_fds[pmu_index][fds_index].fd);
+    }
+    perf_free_fds(pmu_fds[pmu_index], num_fds);
   }
 }

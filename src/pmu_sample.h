@@ -40,7 +40,8 @@ void get_pmu_sample(process_list_t* process_info_list,
 void clean_pmu_sample();
 
 void record_pmu_sample(
-         perf_event_desc_t** fds, int num_fds, int proc_num,
-         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS]);
+         perf_event_desc_t** fds, int num_fds, int num_pmus,
+         unsigned long long pmu_info[MAX_NUM_PROCESSES][MAX_EVENTS],
+         int child_thread_mapping[MAX_NUM_PROCESSES * MAX_NUM_THREADS]);
 
 #endif

@@ -210,7 +210,7 @@ void get_process_info(process_list_t* process_list,
         process_list->processes_e[process_list->size].cpu_affinity = 0ULL;
         char child_dir_location[64];
         // Reset the threads count
-        process_list->processes_i->child_thread_ids_size = 0;
+        process_list->processes_i[process_list->size].child_thread_ids_size = 0;
         // The chile processes/threads are located in /proc/*/task/
         sprintf(child_dir_location, "/proc/%s/task/", curr_dir_ptr->d_name);
         DIR* child_dir_ptr = opendir(child_dir_location);
@@ -230,7 +230,8 @@ void get_process_info(process_list_t* process_list,
                 .child_thread_ids[process_list->processes_i[process_list->size]
                                       .child_thread_ids_size] =
                 atoi(curr_child_dir_ptr->d_name);
-            process_list->processes_i->child_thread_ids_size++;
+            process_list->processes_i[process_list->size]
+                .child_thread_ids_size++;
             // Check the affinity information
             char child_stat_location[64];
             sprintf(child_stat_location, "/proc/%s/task/%s/stat",
@@ -369,11 +370,11 @@ void filter_process_info(process_list_t* process_info_list,
         max_value =
             process_info_list->processes_e[temp_index_list[j]].cpu_utilization;
       }
-      // Swap
-      int temp = temp_index_list[i];
-      temp_index_list[i] = temp_index_list[max_index];
-      temp_index_list[max_index] = temp;
     }
+    // Swap
+    int temp = temp_index_list[i];
+    temp_index_list[i] = temp_index_list[max_index];
+    temp_index_list[max_index] = temp;
   }
 
   // Copy the k largest elemented to the filtered list
@@ -383,6 +384,8 @@ void filter_process_info(process_list_t* process_info_list,
   for (i = 0; i < num_of_processes; i++) {
     filtered_process_info_list->processes_e[i] =
         process_info_list->processes_e[temp_index_list[i]];
+    filtered_process_info_list->processes_i[i] =
+        process_info_list->processes_i[temp_index_list[i]];
   }
 }
 
