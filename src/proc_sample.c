@@ -220,10 +220,15 @@ void get_process_info(process_list_t* process_list,
           if (curr_child_dir_ptr->d_name[0] >= '0' &&
               curr_child_dir_ptr->d_name[0] <= '9') {
             // Add the thread ID to the list
-            if (process_list->processes_i[process_list->size].child_thread_ids_size >= MAX_NUM_THREADS) {
-              logging(LOG_CODE_FATAL, "Process %d has too many threads (max is %d).\n", temp_pid, MAX_NUM_THREADS);
+            if (process_list->processes_i[process_list->size]
+                    .child_thread_ids_size >= MAX_NUM_THREADS) {
+              logging(LOG_CODE_FATAL,
+                      "Process %d has too many threads (max is %d).\n",
+                      temp_pid, MAX_NUM_THREADS);
             }
-            process_list->processes_i[process_list->size].child_thread_ids[process_list->processes_i[process_list->size].child_thread_ids_size] =
+            process_list->processes_i[process_list->size]
+                .child_thread_ids[process_list->processes_i[process_list->size]
+                                      .child_thread_ids_size] =
                 atoi(curr_child_dir_ptr->d_name);
             process_list->processes_i->child_thread_ids_size++;
             // Check the affinity information
