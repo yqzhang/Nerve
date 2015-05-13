@@ -31,7 +31,7 @@
 #define PMU_EVENTS_PER_GROUP 5
 
 // Max length of each event list
-#define PMU_EVENTS_NAME_LENGTH 64
+#define PMU_EVENTS_NAME_LENGTH 128
 
 // PMU for NUMA local accesses
 #define PMU_NUMA_LMA "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
