@@ -48,6 +48,7 @@ typedef struct {
   unsigned int ports[MAX_NUM_APPLICATIONS];
   int num_of_applications;
   int num_of_processes;
+  int interval_us;
 } options_t;
 
 static void sig_handler(int n) {
@@ -59,8 +60,9 @@ static void sig_handler(int n) {
 
 static void usage(void) {
   printf(
-      "usage: neuron [-h] [-c config.json]\n"
+      "usage: neuron [-h] [-i 1000] [-c config.json]\n"
       "-h\t\tget help\n"
+      "-i 1000\tsample interval in milliseconds (required)\n"
       "-c config.json\tconfiguration file in JSON format (required)\n");
 }
 
@@ -176,20 +178,30 @@ void parse_config(char* config, options_t* options,
 int main(int argc, char** argv) {
   int c;
   options_t options;
+  options.interval_us = -1;
 
   setlocale(LC_ALL, "");
 
-  while ((c = getopt(argc, argv, "+hc:")) != -1) {
+  while ((c = getopt(argc, argv, "+hi:c:")) != -1) {
     switch (c) {
       case 'h':
         usage();
         exit(0);
+      case 'i':
+        options.interval_us = 1000 * atoi(optarg);
+        break;
       case 'c':
         options.config_file = optarg;
         break;
       default:
         logging(LOG_CODE_FATAL, "Unknown argument");
     }
+  }
+
+  // Check if we have the sample interval
+  if (options.interval_us == -1) {
+    usage();
+    logging(LOG_CODE_FATAL, "Sample interval is required.\n");
   }
 
   // Load the JSON formatted config file
@@ -230,9 +242,8 @@ int main(int argc, char** argv) {
 
     // Profile all the PMU events of all the processes in the list,
     // and sleep for the same time as sample interval
-    // TODO: Change the sample interval to an argument
-    get_pmu_sample(filtered_process_info_list, options.events, 1e6,
-                   &hardware_info);
+    get_pmu_sample(filtered_process_info_list, options.events,
+                   options.interval_us, &hardware_info);
 
     // Get performance statistics from the applications
     get_app_sample();

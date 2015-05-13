@@ -455,16 +455,17 @@ void get_pmu_sample(process_list_t* process_info_list,
                     &prev_network_send_errs, &prev_network_send_drops);
 
   // Sample interval controller
-  usleep(sample_interval - sleep_offset);
+  // usleep(sample_interval - sleep_offset);
+  usleep(sample_interval);
 
   // Correct the amount of time we need to sleep
   struct timeval curr_tvs;
   gettimeofday(&curr_tvs, NULL);
-  sleep_offset = (curr_tvs.tv_sec - si_tvs.tv_sec) * MICROSECONDS +
-      (curr_tvs.tv_usec - si_tvs.tv_usec) - sample_interval;
+  // sleep_offset = (curr_tvs.tv_sec - si_tvs.tv_sec) * MICROSECONDS +
+  //     (curr_tvs.tv_usec - si_tvs.tv_usec) - sample_interval;
   si_tvs = curr_tvs;
 
-  logging(LOG_CODE_INFO, "offset: %d\n", sleep_offset);
+  // logging(LOG_CODE_INFO, "offset: %d\n", sleep_offset);
 
   // Network interrupt handling
   get_irq_stats(interrupt_per_core);
