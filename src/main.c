@@ -34,10 +34,12 @@
 #define PMU_EVENTS_NAME_LENGTH 128
 
 // PMU for NUMA local accesses
-#define PMU_NUMA_LMA "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
+#define PMU_NUMA_LMA \
+  "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
 
 // PMU for NUMA remote accesses
-#define PMU_NUMA_RMA "OFFCORE_RESPONSE_0:DMND_DATA_RD:LLC_MISS_REMOTE:SNP_MISS:SNP_NO_FWD"
+#define PMU_NUMA_RMA \
+  "OFFCORE_RESPONSE_0:DMND_DATA_RD:LLC_MISS_REMOTE:SNP_MISS:SNP_NO_FWD"
 
 typedef struct {
   const char* events[MAX_EVENTS];
@@ -49,6 +51,7 @@ typedef struct {
   int num_of_applications;
   int num_of_processes;
   int interval_us;
+  char* output_file;
 } options_t;
 
 static void sig_handler(int n) {
@@ -63,7 +66,8 @@ static void usage(void) {
       "usage: nerve [-h] [-i 1000] [-c config.json]\n"
       "-h\t\tget help\n"
       "-i 1000\tsample interval in milliseconds (required)\n"
-      "-c config.json\tconfiguration file in JSON format (required)\n");
+      "-c config.json\tconfiguration file in JSON format (required)\n"
+      "-o output.bin\toutput file in binary format (required)\n");
 }
 
 void parse_config(char* config, options_t* options,
@@ -179,10 +183,11 @@ int main(int argc, char** argv) {
   int c;
   options_t options;
   options.interval_us = -1;
+  options.output_file = NULL;
 
   setlocale(LC_ALL, "");
 
-  while ((c = getopt(argc, argv, "+hi:c:")) != -1) {
+  while ((c = getopt(argc, argv, "+hi:c:o:")) != -1) {
     switch (c) {
       case 'h':
         usage();
@@ -193,6 +198,9 @@ int main(int argc, char** argv) {
       case 'c':
         options.config_file = optarg;
         break;
+      case 'o':
+        options.output_file = optarg;
+        break;
       default:
         logging(LOG_CODE_FATAL, "Unknown argument");
     }
@@ -202,6 +210,12 @@ int main(int argc, char** argv) {
   if (options.interval_us == -1) {
     usage();
     logging(LOG_CODE_FATAL, "Sample interval is required.\n");
+  }
+
+  // Check if we have the output file
+  if (options.output_file == NULL) {
+    usage();
+    logging(LOG_CODE_FATAL, "Output file is required.\n");
   }
 
   // Load the JSON formatted config file
@@ -249,8 +263,7 @@ int main(int argc, char** argv) {
     get_app_sample();
 
     // Record all the information
-    // TODO: Change the file name to an argument
-    write_all("temp.txt", true, hardware_info.num_of_cores,
+    write_all(options.output_file, true, hardware_info.num_of_cores,
               options.num_of_processes, hardware_info.num_of_events,
               hardware_info.irq_info, hardware_info.network_info,
               hardware_info.frequency_info,
