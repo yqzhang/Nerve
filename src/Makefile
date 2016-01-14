@@ -1,4 +1,4 @@
-TARGET         = neuron
+TARGET         = nerve
 
 PERF_EVENT_HDR = /usr/local/include/perfmon/
 PFMLIB         = -lpfm

@@ -60,7 +60,7 @@ static void sig_handler(int n) {
 
 static void usage(void) {
   printf(
-      "usage: neuron [-h] [-i 1000] [-c config.json]\n"
+      "usage: nerve [-h] [-i 1000] [-c config.json]\n"
       "-h\t\tget help\n"
       "-i 1000\tsample interval in milliseconds (required)\n"
       "-c config.json\tconfiguration file in JSON format (required)\n");
