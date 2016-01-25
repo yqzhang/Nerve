@@ -9,7 +9,7 @@ LIBS           = -pthread -ljansson $(PFMLIB)
 CFLAGS         = -Wall -D_GNU_SOURCE $(INCLUDES)
 
 SRCS = app_sample.c \
-			 config_util.c \
+       config_util.c \
        file_util.c \
        log_util.c \
        main.c \
