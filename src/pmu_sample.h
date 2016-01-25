@@ -21,6 +21,20 @@
 
 #define MAX_NUM_CORES 40
 
+// Max number of PMU events that can be used in each group
+#define PMU_EVENTS_PER_GROUP 5
+
+// Max length of each event list
+#define PMU_EVENTS_NAME_LENGTH 128
+
+// PMU for NUMA local accesses
+#define PMU_NUMA_LMA \
+  "OFFCORE_RESPONSE_1:DMND_DATA_RD:LLC_MISS_LOCAL:SNP_MISS:SNP_NO_FWD"
+
+// PMU for NUMA remote accesses
+#define PMU_NUMA_RMA \
+  "OFFCORE_RESPONSE_0:DMND_DATA_RD:LLC_MISS_REMOTE:SNP_MISS:SNP_NO_FWD"
+
 typedef struct hardware_info {
   int num_of_cores;
   int num_of_events;

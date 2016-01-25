@@ -11,3 +11,6 @@ neuron
 # Shared objects
 *.so
 *.so.*
+
+# R files
+*.RData

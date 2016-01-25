@@ -27,13 +27,13 @@ void get_process_info(process_list_t* process_list,
   // Read /proc/stat for total CPU time spent by far
   // cpu %user %nice %system %idle %iowait %irq %softirq
   char pid_stat_location[32] = "/proc/stat";
-  char pid_status_location[32];
-  char pid_io_location[32];
 
   FILE *fp;
   fp = fopen(pid_stat_location, "r");
   if (fp == NULL) {
-    logging(LOG_CODE_FATAL, "Stat File %s does not exist.\n", pid_stat_location);
+    logging(LOG_CODE_FATAL,
+            "Stat File %s does not exist.\n",
+            pid_stat_location);
   }
   unsigned long temp_cpu_total_time[7];
   fscanf(fp, "%*s %lu %lu %lu %lu %lu %lu %lu",
@@ -103,76 +103,6 @@ void get_process_info(process_list_t* process_list,
              &vsize_bytes, &rss_pages);
       fclose(fp);
 
-      sprintf(pid_status_location, "/proc/%s/status", curr_dir_ptr->d_name);
-      fp = fopen(pid_status_location, "r");
-      if (fp == NULL) {
-        // This means the process has gone shortly after we list the directory
-        continue;
-      }
-
-      // Read /proc/*/status for information about:
-      // - context switches
-      // file format: http://man7.org/linux/man-pages/man5/proc.5.html
-      // ...
-      // voluntary_ctxt_switches:        150
-      // nonvoluntary_ctxt_switches:     545
-      unsigned long long voluntary_ctxt_switches, nonvoluntary_ctxt_switches;
-      char line_buffer[4][256];
-      char* prev_line = line_buffer[0];
-      char* curr_line = line_buffer[1];
-      char* next_line = line_buffer[2];
-      while (fgets(next_line, 256, fp) != NULL) {
-        // Rotate the pointers
-        char* tmp_ptr = prev_line;
-        prev_line = curr_line;
-        curr_line = next_line;
-        next_line = tmp_ptr;
-      }
-      fclose(fp);
-
-      // We should expect prev_line, curr_line contain the last 2 lines
-      int j = 0;
-      while (!isspace(prev_line[j])) j++;
-      voluntary_ctxt_switches = atoll(&prev_line[j]);
-      j = 0;
-      while (!isspace(curr_line[j])) j++;
-      nonvoluntary_ctxt_switches = atoll(&curr_line[j]);
-
-      sprintf(pid_io_location, "/proc/%s/io", curr_dir_ptr->d_name);
-      fp = fopen(pid_io_location, "r");
-      if (fp == NULL) {
-        // This means the process has gone shortly after we list the directory
-        continue;
-      }
-
-      // Read /proc/*/io for information about
-      // - I/O
-      // file format: http://man7.org/linux/man-pages/man5/proc.5.html
-      // ...
-      // read_bytes: 0
-      // write_bytes: 323932160
-      // cancelled_write_bytes: 0
-      unsigned long long read_bytes, write_bytes;
-      char* prev_prev_line = line_buffer[3];
-      while (fgets(next_line, 256, fp) != NULL) {
-        // Rotate the pointers
-        char* tmp_ptr = prev_prev_line;
-        prev_prev_line = prev_line;
-        prev_line = curr_line;
-        curr_line = next_line;
-        next_line = tmp_ptr;
-      }
-      fclose(fp);
-
-      // We should expect prev_prev_line, prev_line, curr_line contain the last
-      // 3 lines
-      j = 0;
-      while (!isspace(prev_prev_line[j])) j++;
-      read_bytes = atoll(&prev_prev_line[j]);
-      j = 0;
-      while (!isspace(prev_line[j])) j++;
-      write_bytes = atoll(&prev_line[j]);
-
       if (process_state != 'Z') {
         temp_pid = atoi(curr_dir_ptr->d_name);
         // PID
@@ -197,71 +127,7 @@ void get_process_info(process_list_t* process_list,
                                   sysconf(_SC_PAGESIZE));
         process_list->processes_e[process_list->size].real_mem_utilization =
             (float)rss_pages / sysconf(_SC_PHYS_PAGES);
-        // Context switches
-        process_list->processes_i[process_list->size].voluntary_ctxt_switches =
-            voluntary_ctxt_switches;
-        process_list->processes_i[process_list->size].nonvoluntary_ctxt_switches =
-            nonvoluntary_ctxt_switches;
-        // I/O
-        process_list->processes_i[process_list->size].read_bytes = read_bytes;
-        process_list->processes_i[process_list->size].write_bytes = write_bytes;
 
-        // Get the CPU affinity information of all child processes/threads
-        process_list->processes_e[process_list->size].cpu_affinity = 0ULL;
-        char child_dir_location[64];
-        // Reset the threads count
-        process_list->processes_i[process_list->size].child_thread_ids_size = 0;
-        // The chile processes/threads are located in /proc/*/task/
-        sprintf(child_dir_location, "/proc/%s/task/", curr_dir_ptr->d_name);
-        DIR* child_dir_ptr = opendir(child_dir_location);
-        struct dirent* curr_child_dir_ptr;
-
-        while ((curr_child_dir_ptr = readdir(child_dir_ptr)) != NULL) {
-          if (curr_child_dir_ptr->d_name[0] >= '0' &&
-              curr_child_dir_ptr->d_name[0] <= '9') {
-            // Add the thread ID to the list
-            if (process_list->processes_i[process_list->size]
-                    .child_thread_ids_size >= MAX_NUM_THREADS) {
-              logging(LOG_CODE_FATAL,
-                      "Process %d has too many threads (max is %d).\n",
-                      temp_pid, MAX_NUM_THREADS);
-            }
-            process_list->processes_i[process_list->size]
-                .child_thread_ids[process_list->processes_i[process_list->size]
-                                      .child_thread_ids_size] =
-                atoi(curr_child_dir_ptr->d_name);
-            process_list->processes_i[process_list->size]
-                .child_thread_ids_size++;
-            // Check the affinity information
-            char child_stat_location[64];
-            sprintf(child_stat_location, "/proc/%s/task/%s/stat",
-                    curr_dir_ptr->d_name, curr_child_dir_ptr->d_name);
-            FILE* child_fp = fopen(child_stat_location, "r");
-            if (child_fp == NULL) {
-              // This means the it has gone shortly after we list the directory
-              continue;
-            }
-            // Read /proc/*/task/*/stat for the CPU affinity information
-            // file format: http://man7.org/linux/man-pages/man5/proc.5.html
-            // ...
-            // (24) processor  %d : CPU number last executed on
-            // ...
-            int processor;
-            fscanf(child_fp,
-                   "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u " // 1 - 12
-                   "%*u %*u %*u %*d %*d %*d %*d %*d %*d %*u %*u %*d " // 13 - 24
-                   "%*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u " // 25 - 36
-                   "%*u %*d %d", // 37 - 39
-                   &processor);
-            fclose(child_fp);
-            // Keep a mask for CPU affinity
-            process_list->processes_e[process_list->size].cpu_affinity |=
-                (1ULL << processor);
-          }
-        }
-        // Close the directory
-        (void)closedir(child_dir_ptr);
-	
         // Try to find the PID in the previous list
         while (i < prev_process_list->size &&
                prev_process_list->processes_e[i].process_id < temp_pid) {
@@ -280,26 +146,6 @@ void get_process_info(process_list_t* process_list,
               (float)process_list->processes_i[process_list->size].ttime /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          // Context switch rate
-          process_list->processes_e[process_list->size].v_ctxt_switch_rate =
-              (float)process_list->processes_i[process_list->size]
-                         .voluntary_ctxt_switches /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          process_list->processes_e[process_list->size].nv_ctxt_switch_rate =
-              (float)process_list->processes_i[process_list->size]
-                         .nonvoluntary_ctxt_switches /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          // I/O
-          process_list->processes_e[process_list->size].io_read_rate =
-              (float)process_list->processes_i[process_list->size].read_bytes /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          process_list->processes_e[process_list->size].io_write_rate =
-              (float)process_list->processes_i[process_list->size].write_bytes /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
         // The PID is in the original list
         } else {
           // Page fault rate
@@ -314,31 +160,6 @@ void get_process_info(process_list_t* process_list,
                       prev_process_list->processes_i[i].ttime) /
               (process_list->cpu_total_time -
                prev_process_list->cpu_total_time);
-          // Context switch rate
-          process_list->processes_e[process_list->size].v_ctxt_switch_rate =
-              (float)(process_list->processes_i[process_list->size]
-                          .voluntary_ctxt_switches -
-                      prev_process_list->processes_i[i].voluntary_ctxt_switches) /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          process_list->processes_e[process_list->size].nv_ctxt_switch_rate =
-              (float)(process_list->processes_i[process_list->size]
-                          .nonvoluntary_ctxt_switches -
-                      prev_process_list->processes_i[i]
-                          .nonvoluntary_ctxt_switches) /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          // I/O
-          process_list->processes_e[process_list->size].io_read_rate =
-              (float)(process_list->processes_i[process_list->size].read_bytes -
-                      prev_process_list->processes_i[i].read_bytes) /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
-          process_list->processes_e[process_list->size].io_write_rate =
-              (float)(process_list->processes_i[process_list->size].write_bytes -
-                      prev_process_list->processes_i[i].write_bytes) /
-              (process_list->cpu_total_time -
-               prev_process_list->cpu_total_time);
         }
         process_list->size++;
       }
@@ -348,13 +169,252 @@ void get_process_info(process_list_t* process_list,
   (void)closedir(dir_ptr);
 }
 
-void filter_process_info(process_list_t* process_info_list,
-                         process_list_t* filtered_process_info_list,
+void get_process_stats(process_list_t* filtered_process_list,
+                       process_list_t* process_list,
+                       process_list_t* prev_process_list) {
+  int proc_index;
+  char pid_io_location[32];
+  char pid_status_location[32];
+  FILE *fp;
+
+  // Iterate through the filtered process list and get more detailed statistics
+  // about the filtered processes.
+  for (proc_index = 0;
+       proc_index < filtered_process_list->size;
+       proc_index++) {
+    int curr_pid =
+        filtered_process_list->processes_e[proc_index].process_id;
+
+    // Find the index of this process in prev_process_list. If it already
+    // exists, set prev_process_list_idx to the index. Otherwise, it remains
+    // invalid (-1).
+    int i = 0;
+    int prev_process_list_idx = -1;
+    for (i = 0; i < prev_process_list->size; i++) {
+      if (curr_pid == prev_process_list->processes_e[i].process_id) {
+        prev_process_list_idx = i;
+        break;
+      }
+    }
+
+    // Find the index of this process in process_list. If it already
+    // exists, set process_list_idx to the index. Otherwise, it remains invalid
+    // (-1).
+    int process_list_idx = -1;
+    for (i = 0; i < process_list->size; i++) {
+      if (curr_pid == process_list->processes_e[i].process_id) {
+        process_list_idx = i;
+        break;
+      }
+    }
+
+    sprintf(pid_status_location, "/proc/%d/status", curr_pid);
+    fp = fopen(pid_status_location, "r");
+    if (fp == NULL) {
+      // This means the process has gone shortly after we list the directory
+      continue;
+    }
+
+    // Read /proc/*/status for information about:
+    // - context switches
+    // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+    // ...
+    // voluntary_ctxt_switches:        150
+    // nonvoluntary_ctxt_switches:     545
+    unsigned long long voluntary_ctxt_switches, nonvoluntary_ctxt_switches;
+    char line_buffer[4][256];
+    char* prev_line = line_buffer[0];
+    char* curr_line = line_buffer[1];
+    char* next_line = line_buffer[2];
+    while (fgets(next_line, 256, fp) != NULL) {
+      // Rotate the pointers
+      char* tmp_ptr = prev_line;
+      prev_line = curr_line;
+      curr_line = next_line;
+      next_line = tmp_ptr;
+    }
+    fclose(fp);
+
+    // We should expect prev_line, curr_line contain the last 2 lines
+    int j = 0;
+    while (!isspace(prev_line[j])) j++;
+    voluntary_ctxt_switches = atoll(&prev_line[j]);
+    j = 0;
+    while (!isspace(curr_line[j])) j++;
+    nonvoluntary_ctxt_switches = atoll(&curr_line[j]);
+
+    sprintf(pid_io_location, "/proc/%d/io", curr_pid);
+    fp = fopen(pid_io_location, "r");
+    if (fp == NULL) {
+      // This means the process has gone shortly after we list the directory
+      continue;
+    }
+
+    // Read /proc/*/io for information about
+    // - I/O
+    // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+    // ...
+    // read_bytes: 0
+    // write_bytes: 323932160
+    // cancelled_write_bytes: 0
+    unsigned long long read_bytes, write_bytes;
+    char* prev_prev_line = line_buffer[3];
+    while (fgets(next_line, 256, fp) != NULL) {
+      // Rotate the pointers
+      char* tmp_ptr = prev_prev_line;
+      prev_prev_line = prev_line;
+      prev_line = curr_line;
+      curr_line = next_line;
+      next_line = tmp_ptr;
+    }
+    fclose(fp);
+
+    // We should expect prev_prev_line, prev_line, curr_line contain the last
+    // 3 lines
+    j = 0;
+    while (!isspace(prev_prev_line[j])) j++;
+    read_bytes = atoll(&prev_prev_line[j]);
+    j = 0;
+    while (!isspace(prev_line[j])) j++;
+    write_bytes = atoll(&prev_line[j]);
+
+    // Context switches
+    process_list->processes_i[process_list_idx].voluntary_ctxt_switches =
+        voluntary_ctxt_switches;
+    process_list->processes_i[process_list_idx]
+        .nonvoluntary_ctxt_switches = nonvoluntary_ctxt_switches;
+    // I/O
+    process_list->processes_i[process_list_idx].read_bytes = read_bytes;
+    process_list->processes_i[process_list_idx].write_bytes = write_bytes;
+
+    // Get the CPU affinity information of all child processes/threads
+    process_list->processes_e[process_list_idx].cpu_affinity = 0ULL;
+    char child_dir_location[64];
+    // Reset the threads count
+    process_list->processes_i[process_list_idx].child_thread_ids_size = 0;
+    // The chile processes/threads are located in /proc/*/task/
+    sprintf(child_dir_location, "/proc/%d/task/", curr_pid);
+    DIR* child_dir_ptr = opendir(child_dir_location);
+    struct dirent* curr_child_dir_ptr;
+
+    while ((curr_child_dir_ptr = readdir(child_dir_ptr)) != NULL) {
+      if (curr_child_dir_ptr->d_name[0] >= '0' &&
+          curr_child_dir_ptr->d_name[0] <= '9') {
+        // Add the thread ID to the list
+        if (process_list->processes_i[process_list->size]
+                .child_thread_ids_size >= MAX_NUM_THREADS) {
+          logging(LOG_CODE_FATAL,
+                  "Process %d has too many threads (max is %d).\n",
+                  curr_pid, MAX_NUM_THREADS);
+        }
+        process_list->processes_i[process_list->size]
+            .child_thread_ids[process_list->processes_i[process_list->size]
+                              .child_thread_ids_size] =
+            atoi(curr_child_dir_ptr->d_name);
+        process_list->processes_i[process_list->size].child_thread_ids_size++;
+        // Check the affinity information
+        char child_stat_location[64];
+        sprintf(child_stat_location, "/proc/%d/task/%s/stat",
+                curr_pid, curr_child_dir_ptr->d_name);
+        FILE* child_fp = fopen(child_stat_location, "r");
+        if (child_fp == NULL) {
+          // This means the it has gone shortly after we list the directory
+          continue;
+        }
+        // Read /proc/*/task/*/stat for the CPU affinity information
+        // file format: http://man7.org/linux/man-pages/man5/proc.5.html
+        // ...
+        // (24) processor  %d : CPU number last executed on
+        // ...
+        int processor;
+        fscanf(child_fp,
+               "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u " // 1 - 12
+               "%*u %*u %*u %*d %*d %*d %*d %*d %*d %*u %*u %*d " // 13 - 24
+               "%*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u %*u " // 25 - 36
+               "%*u %*d %d", // 37 - 39
+               &processor);
+        fclose(child_fp);
+        // Keep a mask for CPU affinity
+        process_list->processes_e[process_list->size].cpu_affinity |=
+            (1ULL << processor);
+      }
+    }
+    // Close the directory
+    (void)closedir(child_dir_ptr);
+
+    // The PID does not exist in the original list
+    if (prev_process_list_idx == -1) {
+      // Context switch rate
+      process_list->processes_e[process_list_idx]
+          .v_ctxt_switch_rate =
+              (float)process_list->processes_i[process_list_idx]
+                     .voluntary_ctxt_switches /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      process_list->processes_e[process_list_idx].nv_ctxt_switch_rate =
+          (float)process_list->processes_i[process_list_idx]
+                     .nonvoluntary_ctxt_switches /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      // I/O
+      process_list->processes_e[process_list_idx].io_read_rate =
+          (float)process_list->processes_i[process_list_idx].read_bytes /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      process_list->processes_e[process_list_idx].io_write_rate =
+          (float)process_list->processes_i[process_list_idx].write_bytes /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+    // The PID is in the original list
+    } else {
+      // Context switch rate
+      process_list->processes_e[process_list_idx].v_ctxt_switch_rate =
+          (float)(process_list->processes_i[process_list_idx]
+                      .voluntary_ctxt_switches -
+                  prev_process_list->processes_i[prev_process_list_idx]
+                      .voluntary_ctxt_switches) /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      process_list->processes_e[process_list_idx].nv_ctxt_switch_rate =
+          (float)(process_list->processes_i[process_list_idx]
+                      .nonvoluntary_ctxt_switches -
+                  prev_process_list->processes_i[prev_process_list_idx]
+                      .nonvoluntary_ctxt_switches) /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      // I/O
+      process_list->processes_e[process_list_idx].io_read_rate =
+          (float)(process_list->processes_i[process_list_idx].read_bytes -
+                  prev_process_list->processes_i[prev_process_list_idx].read_bytes) /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+      process_list->processes_e[process_list_idx].io_write_rate =
+          (float)(process_list->processes_i[process_list_idx]
+                      .write_bytes -
+                  prev_process_list->processes_i[prev_process_list_idx].write_bytes) /
+          (process_list->cpu_total_time -
+           prev_process_list->cpu_total_time);
+    }
+
+    // Fill the numbers to the filtered list
+    filtered_process_list->processes_e[proc_index].v_ctxt_switch_rate =
+        process_list->processes_e[process_list_idx].v_ctxt_switch_rate;
+    filtered_process_list->processes_e[proc_index].nv_ctxt_switch_rate =
+        process_list->processes_e[process_list_idx].nv_ctxt_switch_rate;
+    filtered_process_list->processes_e[proc_index].io_read_rate =
+        process_list->processes_e[process_list_idx].io_read_rate;
+    filtered_process_list->processes_e[proc_index].io_write_rate =
+        process_list->processes_e[process_list_idx].io_write_rate;
+  }
+}
+
+void filter_process_info(process_list_t* process_list,
+                         process_list_t* filtered_process_list,
                          int num_of_processes) {
   // Create a temporary index array to avoid modification on the original array
   int temp_index_list[MAX_NUM_PROCESSES];
   int i, j;
-  for (i = 0; i < process_info_list->size; i++) {
+  for (i = 0; i < process_list->size; i++) {
     temp_index_list[i] = i;
   }
 
@@ -362,13 +422,13 @@ void filter_process_info(process_list_t* process_info_list,
   for (i = 0; i < num_of_processes; i++) {
     int max_index = i;
     float max_value =
-        process_info_list->processes_e[temp_index_list[i]].cpu_utilization;
-    for (j = i + 1; j < process_info_list->size; j++) {
-      if (process_info_list->processes_e[temp_index_list[j]].cpu_utilization >
+        process_list->processes_e[temp_index_list[i]].cpu_utilization;
+    for (j = i + 1; j < process_list->size; j++) {
+      if (process_list->processes_e[temp_index_list[j]].cpu_utilization >
           max_value) {
         max_index = j;
         max_value =
-            process_info_list->processes_e[temp_index_list[j]].cpu_utilization;
+            process_list->processes_e[temp_index_list[j]].cpu_utilization;
       }
     }
     // Swap
@@ -378,14 +438,14 @@ void filter_process_info(process_list_t* process_info_list,
   }
 
   // Copy the k largest elemented to the filtered list
-  filtered_process_info_list->cpu_total_time =
-      process_info_list->cpu_total_time;
-  filtered_process_info_list->size = num_of_processes;
+  filtered_process_list->cpu_total_time =
+      process_list->cpu_total_time;
+  filtered_process_list->size = num_of_processes;
   for (i = 0; i < num_of_processes; i++) {
-    filtered_process_info_list->processes_e[i] =
-        process_info_list->processes_e[temp_index_list[i]];
-    filtered_process_info_list->processes_i[i] =
-        process_info_list->processes_i[temp_index_list[i]];
+    filtered_process_list->processes_e[i] =
+        process_list->processes_e[temp_index_list[i]];
+    filtered_process_list->processes_i[i] =
+        process_list->processes_i[temp_index_list[i]];
   }
 }
 
