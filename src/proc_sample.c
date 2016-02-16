@@ -21,7 +21,8 @@
 #include <unistd.h>
 
 void get_process_info(process_list_t* process_list,
-                      process_list_t* prev_process_list) {
+                      process_list_t* prev_process_list,
+                      int nerve_pid) {
   struct dirent* curr_dir_ptr;
 
   // Read /proc/stat for total CPU time spent by far
@@ -67,6 +68,12 @@ void get_process_info(process_list_t* process_list,
                 MAX_NUM_PROCESSES);
       }
       sprintf(pid_stat_location, "/proc/%s/stat", curr_dir_ptr->d_name);
+      temp_pid = atoi(curr_dir_ptr->d_name);
+
+      if (temp_pid == nerve_pid) {
+        continue;
+      }
+
       fp = fopen(pid_stat_location, "r");
       if (fp == NULL) {
         // This means the process has gone shortly after we list the directory
@@ -104,7 +111,6 @@ void get_process_info(process_list_t* process_list,
       fclose(fp);
 
       if (process_state != 'Z') {
-        temp_pid = atoi(curr_dir_ptr->d_name);
         // PID
         process_list->processes_e[process_list->size].process_id = temp_pid;
         // Page faults
@@ -301,17 +307,17 @@ void get_process_stats(process_list_t* filtered_process_list,
       if (curr_child_dir_ptr->d_name[0] >= '0' &&
           curr_child_dir_ptr->d_name[0] <= '9') {
         // Add the thread ID to the list
-        if (process_list->processes_i[process_list->size]
+        if (process_list->processes_i[process_list_idx]
                 .child_thread_ids_size >= MAX_NUM_THREADS) {
           logging(LOG_CODE_FATAL,
                   "Process %d has too many threads (max is %d).\n",
                   curr_pid, MAX_NUM_THREADS);
         }
-        process_list->processes_i[process_list->size]
-            .child_thread_ids[process_list->processes_i[process_list->size]
+        process_list->processes_i[process_list_idx]
+            .child_thread_ids[process_list->processes_i[process_list_idx]
                               .child_thread_ids_size] =
             atoi(curr_child_dir_ptr->d_name);
-        process_list->processes_i[process_list->size].child_thread_ids_size++;
+        process_list->processes_i[process_list_idx].child_thread_ids_size++;
         // Check the affinity information
         char child_stat_location[64];
         sprintf(child_stat_location, "/proc/%d/task/%s/stat",
@@ -335,7 +341,7 @@ void get_process_stats(process_list_t* filtered_process_list,
                &processor);
         fclose(child_fp);
         // Keep a mask for CPU affinity
-        process_list->processes_e[process_list->size].cpu_affinity |=
+        process_list->processes_e[process_list_idx].cpu_affinity |=
             (1ULL << processor);
       }
     }

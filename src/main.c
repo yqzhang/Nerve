@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 #include "app_sample.h"
 #include "config_util.h"
@@ -109,6 +110,8 @@ int main(int argc, char** argv) {
                   options.num_of_applications);
   init_pmu_sample(&hardware_info);
 
+  int nerve_pid = (int) getpid();
+
   /**
    * This is the main loop where all the monitoring happens. In each interation:
    *  1) find out the top cycle-consuming running processes
@@ -120,7 +123,7 @@ int main(int argc, char** argv) {
   while (true) {
     // Sample all the running processes, and calculate their utilization
     // information in the last sample interval
-    get_process_info(process_info_list, prev_process_info_list);
+    get_process_info(process_info_list, prev_process_info_list, nerve_pid);
 
     // Filter the list of processes by a list of thresholds
     filter_process_info(process_info_list, filtered_process_info_list,
@@ -137,7 +140,7 @@ int main(int argc, char** argv) {
                    options.interval_us, &hardware_info);
 
     // Get performance statistics from the applications
-    get_app_sample();
+    // get_app_sample();
 
     // Record all the information
     write_all(options.output_file, true, hardware_info.num_of_cores,

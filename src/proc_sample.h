@@ -70,7 +70,8 @@ typedef struct process_list {
 } process_list_t;
 
 void get_process_info(process_list_t* process_info_list,
-                      process_list_t* prev_process_info_list);
+                      process_list_t* prev_process_info_list,
+                      int nerve_pid);
 
 void get_process_stats(process_list_t* filtered_process_info_list,
                        process_list_t* process_info_list,
