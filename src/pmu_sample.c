@@ -275,12 +275,9 @@ void get_cpu_cycles(unsigned long long* cycles, struct timeval* tvs,
   // Get the cycle count
   *cycles = rdtsc();
 
-  for (i = 0; i < num_of_cores / 2; i++) {
+  for (i = 0; i < num_of_cores; i++) {
     cpu_clk_unhalted_core[i] = read_msr(i, CPU_CLK_UNHALTED_CORE, 63, 0);
     cpu_clk_unhalted_ref[i] = read_msr(i, CPU_CLK_UNHALTED_REF, 63, 0);
-    // For SMT cores
-    cpu_clk_unhalted_core[i + num_of_cores / 2] = cpu_clk_unhalted_core[i];
-    cpu_clk_unhalted_ref[i + num_of_cores / 2] = cpu_clk_unhalted_ref[i];
   }
 }
 
