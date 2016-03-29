@@ -101,6 +101,12 @@ void get_irq_stats(long long interrupt_per_core[MAX_NUM_CORES]) {
   char line[MAX_LENGTH_PER_LINE];
   long long local_interrupt_per_core[MAX_NUM_CORES];
 
+  // Reset the counters
+  int c;
+  for (c = 0; c < num_of_cores; c++) {
+    interrupt_per_core[c] = 0;
+  }
+
   fp = fopen("/proc/interrupts", "r");
   if (fp == NULL) {
     logging(LOG_CODE_FATAL, "Unable to read /proc/interrupts.\n");
