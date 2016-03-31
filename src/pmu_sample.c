@@ -294,6 +294,9 @@ void estimate_frequency(unsigned int frequency_info[MAX_NUM_CORES]) {
       (tvs[1].tv_sec - tvs[0].tv_sec) * MICROSECONDS +
       (tvs[1].tv_usec - tvs[0].tv_usec);
 
+  unsigned int total_freq = 0;
+  int total_cores = 0;
+
   // FIXME: There seems to be some issues reading MSR on SandyBridge when
   // SMT is enabled, maybe we should instead use the numbers we get from the
   // actual logical cores.
@@ -321,7 +324,22 @@ void estimate_frequency(unsigned int frequency_info[MAX_NUM_CORES]) {
         ((cycles[1] - cycles[0]) / microseconds) *
         ((double) delta_cpu_clk_unhalted_core /
          (double) delta_cpu_clk_unhalted_ref);
-    frequency_info[i] = frequency;
+
+    // FIXME: sometimes cpu_clk_unhalted_core shows weird numbers
+    if (frequency > 4000) {
+      frequency_info[i] = 0;
+    } else {
+      frequency_info[i] = frequency;
+      total_freq += frequency;
+      total_cores++;
+    }
+  }
+
+  unsigned int avg_frequency = total_freq / total_cores;
+  for (i = 0; i < num_of_cores; i++) {
+    if (frequency_info[i] == 0) {
+      frequency_info[i] = avg_frequency;
+    }
   }
 }
 
@@ -370,16 +388,19 @@ void record_pmu_sample(
       ret = read(fds[pmu_index][fds_index].fd, values, sizeof(values));
       if (ret < (ssize_t)sizeof(values)) {
         if (ret == -1) {
-          logging(LOG_CODE_FATAL, "cannot read results: %s", "strerror(errno)");
+          // FIXME: the corresponding process has already gone
+          // logging(LOG_CODE_WARNING, "cannot read results: %s", "strerror(errno)");
+          val = 0;
         } else {
-          logging(LOG_CODE_WARNING, "could not read event%d", fds_index);
+          logging(LOG_CODE_WARNING, "could not read event %d", fds_index);
         }
+      } else {
+        /*
+         * scaling is systematic because we may be sharing the PMU and
+         * thus may be multiplexed
+         */
+        val = perf_scale(values);
       }
-      /*
-       * scaling is systematic because we may be sharing the PMU and
-       * thus may be multiplexed
-       */
-      val = perf_scale(values);
 
       pmu_info[child_thread_mapping[pmu_index]][fds_index] += val;
     }
@@ -424,8 +445,9 @@ void get_pmu_sample(process_list_t* process_info_list,
             &pmu_fds[pmu_index][fds_index].hw,
             process_info_list->processes_i[proc_index].child_thread_ids[i],
             -1, -1, 0);
+        // TODO: The corresponding process has already gone
         if (pmu_fds[pmu_index][fds_index].fd == -1) {
-          logging(LOG_CODE_FATAL, "cannot open event %d", fds_index);
+          // logging(LOG_CODE_WARNING, "cannot open event %d, errno: %s\n", fds_index, strerror(errno));
         }
       }
       // Record the parent thread
